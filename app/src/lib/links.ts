@@ -4,7 +4,8 @@
  * A Google Sheet with the sync script already inside, shared as a "Make a copy" link
  * (https://docs.google.com/spreadsheets/d/<id>/copy). Leave empty to hide the button.
  */
-export const SHEET_TEMPLATE_URL: string = '';
+export const SHEET_TEMPLATE_URL: string =
+  'https://docs.google.com/spreadsheets/d/1idp3giIfKVU5MJIQfjVtpRjT35AVrN5mtU-xaHp1xyA/copy';
 
 /** The project's home: source code, and where to ask for help or report a problem. */
 export const REPO_URL: string = 'https://github.com/AlexisDrain/Recommendation-Journal';

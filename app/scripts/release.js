@@ -29,13 +29,46 @@ if (target !== 'phone') {
 }
 console.log(`\nRecommendation Journal ${info.version}, build ${info.build}\n`);
 
-run('npx tsc --noEmit');
-if (target !== 'phone') {
-  fs.rmSync(path.join(app, 'dist'), { recursive: true, force: true });
-  run('npx expo export --platform web');
-  run('npx eas-cli@latest deploy --prod --non-interactive');
+const site = `https://${JSON.parse(fs.readFileSync(path.join(app, 'app.json'), 'utf8')).expo.slug}.expo.app`;
+const entryOf = (html) => html.match(/entry-[a-f0-9]+\.js/)?.[0] ?? null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Waits up to a minute for the live site to serve this export. True once it does. */
+async function siteIsLive(expected) {
+  for (let i = 0; i < 6; i++) {
+    try {
+      const html = await (await fetch(`${site}/?release=${Date.now()}`, { cache: 'no-store' })).text();
+      if (entryOf(html) === expected) return true;
+    } catch {
+      // offline for a moment: try again
+    }
+    await sleep(10_000);
+  }
+  return false;
 }
-if (target !== 'web') {
-  run(`npx eas-cli@latest update --channel preview --environment preview --message "Build ${info.build}" --non-interactive`);
-}
-console.log(`\nPublished build ${info.build} (${target}).`);
+
+(async () => {
+  run('npx tsc --noEmit');
+  let webOk = true;
+  if (target !== 'phone') {
+    fs.rmSync(path.join(app, 'dist'), { recursive: true, force: true });
+    run('npx expo export --platform web');
+    const expected = entryOf(fs.readFileSync(path.join(app, 'dist', 'index.html'), 'utf8'));
+    run('npx eas-cli@latest deploy --prod --non-interactive');
+    // A deploy has once reported success while the site kept the previous build: check, and upload once more if so.
+    if (!(await siteIsLive(expected))) {
+      console.log('\nThe website still shows the previous build. Uploading again…\n');
+      run('npx eas-cli@latest deploy --prod --non-interactive');
+      webOk = await siteIsLive(expected);
+    }
+    console.log(webOk ? `\nChecked: ${site} serves build ${info.build}.` : `\nWARNING: ${site} still doesn't serve build ${info.build}.`);
+  }
+  if (target !== 'web') {
+    run(`npx eas-cli@latest update --channel preview --environment preview --message "Build ${info.build}" --non-interactive`);
+  }
+  console.log(`\nPublished build ${info.build} (${target}).`);
+  if (!webOk) process.exit(1);
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -8,11 +8,29 @@ The app never asks for your Google login. Instead, a small script inside your sh
 updates from the app when they carry your **secret key**. The sheet itself stays private: it is
 never shared, and the script can only touch that one spreadsheet.
 
-Do this on a computer. It takes about 10 minutes, once.
+There are two ways to get the sheet. Both end with the same three steps.
+
+| | Time | Choose it if |
+|---|---|---|
+| **A. Copy the template** | about 3 minutes | you want the quick route |
+| **B. Build it yourself** | about 10 minutes | you'd rather read the code before running it |
+
+Do this on a computer.
 
 ---
 
-## 1. Make the sheet and paste the script
+## A. Copy the template
+
+1. Open the template: **[Recommendation Journal (template)](https://docs.google.com/spreadsheets/d/1idp3giIfKVU5MJIQfjVtpRjT35AVrN5mtU-xaHp1xyA/copy)**
+2. Click **Make a copy**. Google mentions that an Apps Script file is attached: that is the sync
+   script, which you can read any time under **Extensions → Apps Script**.
+
+The copy is your own private spreadsheet. Nobody else, including whoever made the template, can see
+it or its data, and it starts without a key: you create yours in step 1 below.
+
+Now continue with **Finish the setup**.
+
+## B. Build it yourself
 
 1. Create a new Google Sheet (e.g. go to `sheets.new`) and name it, e.g. **Recommendations**.
 2. In the sheet: **Extensions → Apps Script**.
@@ -37,7 +55,15 @@ Do this on a computer. It takes about 10 minutes, once.
       ```
    3. Click **Save**.
 
-## 2. Create your secret key
+Now continue with **Finish the setup**.
+
+---
+
+## Finish the setup
+
+Open the script editor from your sheet: **Extensions → Apps Script**.
+
+### 1. Create your secret key
 
 1. In the function dropdown at the top, pick **`setup`**, then click **Run**.
 2. **If you get "Access blocked: Authorization Error … Error 401: invalid_client"**, Google hasn't
@@ -51,9 +77,9 @@ Do this on a computer. It takes about 10 minutes, once.
    app, it shows *"Google hasn't verified this app"*: click **Advanced → Go to … (unsafe)**.
 4. Check what it asks for. It should be exactly one permission: **"View and manage spreadsheets
    that this application has been installed in"**, meaning this one spreadsheet. If it lists
-   anything else, click **Cancel**, do step 1.4 again, and run `setup` again.
+   anything else, click **Cancel**, do step B.4, and run `setup` again.
 
-## 3. Deploy it as a web app
+### 2. Deploy it as a web app
 
 1. **Deploy → New deployment**, then the gear icon → **Web app**.
 2. **Execute as: Me**, **Who has access: Anyone**, then **Deploy**.
@@ -62,7 +88,7 @@ Do this on a computer. It takes about 10 minutes, once.
 3. Copy the **Web app URL** it shows. It ends in **`/exec`**. (You can find it again under
    **Deploy → Manage deployments**.)
 
-## 4. Connect the app
+### 3. Connect the app
 
 The app asks for two things, in **Settings → Google Sheet**:
 
@@ -118,11 +144,12 @@ Your Web app URL and secret key stay the same, so there is nothing to change in 
 
 ## For maintainers
 
-When the script changes in a way the app should know about, bump `SCRIPT_VERSION` in the script
-and `LATEST_SCRIPT_VERSION` in [`app/src/db/sync.ts`](../app/src/db/sync.ts) together.
+When the script changes: paste the new code into the template sheet too (new copies get it), and
+if the app should know about the change, bump `SCRIPT_VERSION` in the script and
+`LATEST_SCRIPT_VERSION` in [`app/src/db/sync.ts`](../app/src/db/sync.ts) together.
 
-A template sheet (a "Make a copy" link, like Sleep Journal's) can be added later: put the script
-in an empty sheet with the `oauthScopes` line, don't run `setup` or deploy it, share it as
-*Anyone with the link → Viewer*, and put its `…/copy` link in `SHEET_TEMPLATE_URL` in
+The template is an ordinary Google Sheet with the script inside (and the `oauthScopes` line),
+where `setup` was never run and nothing was deployed, shared as *Anyone with the link → Viewer*.
+Its `…/copy` link is in route A above and in `SHEET_TEMPLATE_URL` in
 [`app/src/lib/links.ts`](../app/src/lib/links.ts). A key only works in the spreadsheet it was made
 in, so every copy creates its own.
