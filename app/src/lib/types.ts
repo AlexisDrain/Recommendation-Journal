@@ -33,6 +33,8 @@ export interface Item {
   uid: string;
   categoryUid: string;
   title: string;
+  /** Who made it: the author, director, artist… "Stephen King". */
+  author: string;
   status: Status;
   rating: Rating | null;
   /** Who told you about it: "my brother", "stranger in the park". */
@@ -48,5 +50,5 @@ export interface Item {
   updatedAt: string;
 }
 
-export type ItemPatch = Partial<Pick<Item, 'categoryUid' | 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>>;
+export type ItemPatch = Partial<Pick<Item, 'categoryUid' | 'title' | 'author' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>>;
 export type CategoryPatch = Partial<Pick<Category, 'name' | 'noun' | 'wantLabel' | 'doneLabel' | 'hidden'>>;

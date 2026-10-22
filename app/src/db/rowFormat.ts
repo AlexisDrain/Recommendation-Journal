@@ -9,16 +9,17 @@ import { parseDate } from '@/lib/dates';
 import { parseRating, ratingText } from '@/lib/rating';
 import type { Category, Item, Status } from '@/lib/types';
 
-export const COLUMNS = ['Title', 'Status', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on'] as const;
+export const COLUMNS = ['Title', 'Author', 'Status', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on'] as const;
 export type Column = (typeof COLUMNS)[number];
 export const WIDTHS: Record<Column, number> = {
-  Title: 36, Status: 16, Rating: 16, 'Recommended by': 22, Why: 48, 'Recommended on': 15, 'Experienced on': 15,
+  Title: 36, Author: 22, Status: 16, Rating: 16, 'Recommended by': 22, Why: 48, 'Recommended on': 15, 'Experienced on': 15,
 };
 
 /** One item as the cells of a row. */
 export function itemCells(it: Item, cat: Pick<Category, 'wantLabel' | 'doneLabel'> | undefined): Record<Column, string> {
   return {
     Title: it.title,
+    Author: it.author,
     Status: it.status === 'done' ? cat?.doneLabel || 'Done' : cat?.wantLabel || 'Want to',
     Rating: ratingText(it.rating),
     'Recommended by': it.recommendedBy,
@@ -31,6 +32,8 @@ export function itemCells(it: Item, cat: Pick<Category, 'wantLabel' | 'doneLabel
 // Other names a column may go by in a list made by hand. Compared after normalize().
 const ALIASES: Record<Column | 'Category', string[]> = {
   Title: ['title', 'name', 'media', 'media name', 'item', 'book', 'movie', 'film', 'game', 'show', 'album', 'recipe', 'what'],
+  Author: ['author', 'creator', 'director', 'artist', 'writer', 'written by', 'directed by', 'made by', 'developer', 'studio',
+    'band', 'musician', 'chef', 'host'],
   Status: ['status', 'state', 'seen', 'done', 'watched', 'read', 'played', 'finished', 'have i'],
   Rating: ['rating', 'rated', 'score', 'stars', 'exceptional', 'my rating', 'verdict', 'opinion', 'liked it'],
   'Recommended by': ['recommended by', 'by', 'from', 'who', 'recommender', 'person', 'source', 'who told me', 'suggested by'],
@@ -81,7 +84,8 @@ export function parseStatus(raw: string, cat: Pick<Category, 'wantLabel' | 'done
   return hints.rating || hints.doneOn ? 'done' : 'want';
 }
 
-export type RowFields = Pick<Item, 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>;
+/** `author` is left out when the row has no Author column (an older sheet), so it isn't wiped. */
+export type RowFields = { author?: string } & Pick<Item, 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>;
 
 /**
  * A row's cells → an item's fields, or null for a row without a title.
@@ -105,6 +109,7 @@ export function rowFields(map: HeaderMap, row: string[], cat: Pick<Category, 'wa
   if (keep && !rating && get('Rating')) kept.push(`Rating: ${get('Rating')}`);
   return {
     title,
+    ...(map.col.Author !== undefined && { author: get('Author') }),
     status: parseStatus(get('Status'), cat, { rating: !!rating, doneOn: !!doneOn }),
     rating,
     recommendedBy: get('Recommended by'),

@@ -20,7 +20,7 @@ const CONNECTION_KEY = 'recjournal.sheetConnection';
 const STATE_KEY = 'recjournal.sheetSync.v1';
 const PUSH_BATCH = 300;
 /** The version of google-sheets/RecommendationJournalSync.gs this app was built for (its SCRIPT_VERSION). */
-export const LATEST_SCRIPT_VERSION = 2;
+export const LATEST_SCRIPT_VERSION = 3;
 
 export interface Connection { url: string; secret: string }
 
@@ -307,7 +307,7 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
       const header = Object.keys(r.cells);
       const fields = rowFields(mapHeader(header), header.map((h) => r.cells[h]), local.get(r.category), false);
       if (!fields) continue;
-      await writeItem(tx, { uid: r.id, categoryUid: r.category, deleted: false, updatedAt: r.updated, ...fields });
+      await writeItem(tx, { uid: r.id, categoryUid: r.category, deleted: false, updatedAt: r.updated, ...fields, author: fields.author ?? mine?.author ?? '' });
       count++;
     }
     for (const d of answer.deleted ?? []) {

@@ -3,9 +3,11 @@
 // The whole list (every category and item) is also kept in memory, so the screens can search and
 // filter as you type without waiting for the database. Every write refreshes it, and screens that
 // call useData() redraw.
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SQLite from 'expo-sqlite';
 import { useSyncExternalStore } from 'react';
-import { normalize, suggestWords } from '@/lib/categories';
+import { Platform } from 'react-native';
+import { normalize, tidyWords } from '@/lib/categories';
 import { stamp, today } from '@/lib/dates';
 import type { Category, CategoryPatch, Item, ItemPatch } from '@/lib/types';
 import { migrate } from './migrations';
@@ -39,7 +41,7 @@ const SELECT_CATEGORY = `
   FROM categories`;
 
 const SELECT_ITEM = `
-  SELECT id, uid, category_uid AS categoryUid, title, status, rating, recommended_by AS recommendedBy, note,
+  SELECT id, uid, category_uid AS categoryUid, title, author, status, rating, recommended_by AS recommendedBy, note,
          recommended_on AS recommendedOn, done_on AS doneOn, deleted, created_at AS createdAt, updated_at AS updatedAt
   FROM items`;
 
@@ -70,7 +72,45 @@ export interface Data {
   error: string | null;
 }
 
-let data: Data = { categories: [], items: [], loaded: false, error: null };
+// The list as it was last time, so it shows the moment the app opens. Opening the database can take
+// seconds in some browsers (the SQLite engine starts up and the browser hands over the file); the
+// fresh copy replaces this one as soon as it's read. Kept beside the database, on this device only.
+const SNAPSHOT_KEY = 'recjournal.snapshot.v1';
+
+function webStorage(): Storage | null {
+  try {
+    return Platform.OS === 'web' && typeof window !== 'undefined' ? window.localStorage : null;
+  } catch {
+    return null; // storage blocked: just wait for the database
+  }
+}
+
+function fromSnapshot(raw: string | null): Data | null {
+  try {
+    const s = raw ? (JSON.parse(raw) as Pick<Data, 'categories' | 'items'>) : null;
+    return s && Array.isArray(s.categories) && Array.isArray(s.items) ? { categories: s.categories, items: s.items, loaded: true, error: null } : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSnapshot() {
+  const raw = JSON.stringify({ categories: data.categories, items: data.items });
+  const web = webStorage();
+  if (web) {
+    try {
+      web.setItem(SNAPSHOT_KEY, raw);
+    } catch {
+      // full or blocked: the next start just waits for the database
+    }
+  } else {
+    AsyncStorage.setItem(SNAPSHOT_KEY, raw).catch(() => {});
+  }
+}
+
+let data: Data = fromSnapshot(webStorage()?.getItem(SNAPSHOT_KEY) ?? null) ?? { categories: [], items: [], loaded: false, error: null };
+/** True once the database itself has been read (until then `data` may be the snapshot). */
+let fresh = false;
 const listeners = new Set<() => void>();
 
 /** Reads everything again and redraws the screens. Called after every write. */
@@ -83,14 +123,28 @@ export async function reload(): Promise<void> {
       loaded: true,
       error: null,
     };
+    fresh = true;
+    saveSnapshot();
   } catch (e) {
     data = { ...data, loaded: true, error: (e as Error).message };
   }
   listeners.forEach((fn) => fn());
 }
 
+// Phones: the snapshot is read from storage (a few milliseconds), unless the database won the race.
+if (Platform.OS !== 'web') {
+  AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
+    const s = fromSnapshot(raw);
+    if (s && !fresh) {
+      data = s;
+      listeners.forEach((fn) => fn());
+    }
+  }, () => {});
+}
+// Start opening the database right away, not when the first screen asks for the list.
+void reload();
+
 function subscribe(fn: () => void) {
-  if (!data.loaded && listeners.size === 0) void reload();
   listeners.add(fn);
   return () => void listeners.delete(fn);
 }
@@ -119,6 +173,7 @@ async function changed() {
 const ITEM_COLUMNS = {
   categoryUid: 'category_uid',
   title: 'title',
+  author: 'author',
   status: 'status',
   rating: 'rating',
   recommendedBy: 'recommended_by',
@@ -130,7 +185,7 @@ const ITEM_COLUMNS = {
 /** Tidies a patch: trims text, and stamps "done on" today when something is first marked done. */
 function cleanPatch(patch: ItemPatch, before?: Item): ItemPatch {
   const p: ItemPatch = { ...patch };
-  for (const k of ['title', 'recommendedBy', 'note'] as const) if (p[k] !== undefined) p[k] = p[k]!.trim();
+  for (const k of ['title', 'author', 'recommendedBy', 'note'] as const) if (p[k] !== undefined) p[k] = p[k]!.trim();
   if (p.rating && p.status === undefined && before?.status === 'want') p.status = 'done'; // rating it = you've had it
   if (p.status === 'done' && before?.status !== 'done' && p.doneOn === undefined && !before?.doneOn) p.doneOn = today();
   if (p.status === 'want' && before?.status === 'done' && p.doneOn === undefined) p.doneOn = null;
@@ -181,13 +236,13 @@ const items = {
 /** Writes an item exactly as given (from the sheet or an import), keeping its `updatedAt`. */
 export async function writeItem(tx: SQLite.SQLiteDatabase, it: Omit<Item, 'id' | 'createdAt'> & { createdAt?: string }) {
   await tx.runAsync(
-    `INSERT INTO items (uid, category_uid, title, status, rating, recommended_by, note, recommended_on, done_on, deleted, updated_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, coalesce(?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))
+    `INSERT INTO items (uid, category_uid, title, author, status, rating, recommended_by, note, recommended_on, done_on, deleted, updated_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, coalesce(?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))
      ON CONFLICT (uid) DO UPDATE SET
-       category_uid = excluded.category_uid, title = excluded.title, status = excluded.status, rating = excluded.rating,
+       category_uid = excluded.category_uid, title = excluded.title, author = excluded.author, status = excluded.status, rating = excluded.rating,
        recommended_by = excluded.recommended_by, note = excluded.note, recommended_on = excluded.recommended_on,
        done_on = excluded.done_on, deleted = excluded.deleted, updated_at = excluded.updated_at`,
-    [it.uid, it.categoryUid, it.title, it.status, it.rating, it.recommendedBy, it.note, it.recommendedOn, it.doneOn,
+    [it.uid, it.categoryUid, it.title, it.author, it.status, it.rating, it.recommendedBy, it.note, it.recommendedOn, it.doneOn,
       Number(it.deleted), it.updatedAt, it.createdAt ?? null],
   );
 }
@@ -210,13 +265,13 @@ const categories = {
       if (existing.hidden) await categories.update(existing.uid, { hidden: false });
       return existing;
     }
-    const words = { ...suggestWords(name), ...body };
+    const words = tidyWords(name, body);
     const db = await getDb();
     const uid = newUid();
     await db.runAsync(
       `INSERT INTO categories (uid, name, noun, want_label, done_label, sort_order, updated_at)
        VALUES (?, ?, ?, ?, ?, (SELECT coalesce(max(sort_order), 0) + 1 FROM categories), ?)`,
-      uid, name, words.noun.trim() || 'media', words.wantLabel.trim(), words.doneLabel.trim(), stamp(),
+      uid, name, words.noun, words.wantLabel, words.doneLabel, stamp(),
     );
     await changed();
     return data.categories.find((c) => c.uid === uid)!;
@@ -228,6 +283,12 @@ const categories = {
       if (!patch.name) throw new Error("The name can't be empty.");
       const other = categoryNamed(patch.name);
       if (other && other.uid !== uid) throw new Error(`You already have a category called “${other.name}”.`);
+    }
+    if (patch.noun !== undefined || patch.wantLabel !== undefined || patch.doneLabel !== undefined) {
+      const now = data.categories.find((c) => c.uid === uid);
+      const tidy = tidyWords(patch.name ?? now?.name ?? '', { ...now, ...patch });
+      patch = { ...patch, ...(patch.noun !== undefined && { noun: tidy.noun }),
+        ...(patch.wantLabel !== undefined && { wantLabel: tidy.wantLabel }), ...(patch.doneLabel !== undefined && { doneLabel: tidy.doneLabel }) };
     }
     const cols = Object.entries(CATEGORY_COLUMNS).filter(([k]) => patch[k as keyof CategoryPatch] !== undefined);
     if (!cols.length) return;

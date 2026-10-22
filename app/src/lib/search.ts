@@ -2,7 +2,7 @@
 // keystroke, so even a few thousand recommendations filter instantly, on the phone too.
 //
 // Ignores case, accents and punctuation. Every word you type has to appear somewhere (title,
-// who recommended it, the note, or the category); the start of a word is enough ("godf" finds
+// author, who recommended it, the note, or the category); the start of a word is enough ("godf" finds
 // "The Godfather"). Title matches come first.
 import { normalize } from './categories';
 import type { Category, Item } from './types';
@@ -16,7 +16,7 @@ function indexFor(items: Item[], categories: Category[]): Entry[] {
   const names = new Map(categories.map((c) => [c.uid, c.name]));
   const index = items.map((item) => {
     const title = normalize(item.title);
-    const rest = normalize(`${item.recommendedBy} ${item.note} ${names.get(item.categoryUid) ?? ''}`);
+    const rest = normalize(`${item.author} ${item.recommendedBy} ${item.note} ${names.get(item.categoryUid) ?? ''}`);
     return { item, title, titleWords: title.split(' '), words: [...title.split(' '), ...rest.split(' ')] };
   });
   cache = { items, categories, index };

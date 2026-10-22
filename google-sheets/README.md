@@ -106,7 +106,7 @@ same two things on each.
 
 ## What the sheet looks like
 
-- **One tab per category**, in the app's order. Columns: *Title, Status, Rating, Recommended by,
+- **One tab per category**, in the app's order. Columns: *Title, Author, Status, Rating, Recommended by,
   Why, Recommended on, Experienced on*, then *Id* and *Updated* (grey, for the app's bookkeeping).
 - **Status and Rating** have drop-down lists (`Want to watch` / `Watched`, `❌ Bad` … `❤️ Exceptional`),
   but typing works too: "watched", "yes" or "✓" count as done.

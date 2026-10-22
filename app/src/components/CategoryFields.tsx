@@ -1,11 +1,21 @@
 // The fields of a category: its name, and the words used for its items. While you type a new
 // name, the words are guessed for you ("Flash game" → game / Want to play / Played) until you
 // change one of them yourself.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { CATEGORY_IDEAS, suggestWords } from '@/lib/categories';
 import { colors, space } from '@/lib/theme';
 import { Chip, Input, Muted, styles } from './ui';
+
+/** A label above its box. */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View style={{ gap: space.xs }}>
+      <Text style={{ color: colors.muted, fontSize: 14 }}>{label}</Text>
+      {children}
+    </View>
+  );
+}
 
 export interface CategoryDraft { name: string; noun: string; wantLabel: string; doneLabel: string }
 
@@ -41,22 +51,19 @@ export function CategoryFields({ value, onChange, autoFocus, ideas, onSubmit }: 
           {CATEGORY_IDEAS.map((idea) => <Chip key={idea} label={idea} onPress={() => setName(idea)} />)}
         </View>
       )}
-      <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
-        <Text style={{ color: colors.muted, width: 92 }}>One is called</Text>
-        <Input style={{ flex: 1 }} placeholder="media" value={value.noun} onChangeText={(v) => setWord('noun', v)}
-          autoCapitalize="none" accessibilityLabel="What one item is called" />
-      </View>
-      <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
-        <Text style={{ color: colors.muted, width: 92 }}>On your list</Text>
-        <Input style={{ flex: 1 }} placeholder="Want to experience" value={value.wantLabel}
-          onChangeText={(v) => setWord('wantLabel', v)} accessibilityLabel="Word for things you want to try" />
-      </View>
-      <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
-        <Text style={{ color: colors.muted, width: 92 }}>Done</Text>
-        <Input style={{ flex: 1 }} placeholder="Experienced" value={value.doneLabel}
-          onChangeText={(v) => setWord('doneLabel', v)} accessibilityLabel="Word for things you've done" />
-      </View>
-      <Muted>For example: one is called a “movie”, on your list it’s “Want to watch”, and done it’s “Watched”.</Muted>
+      <Field label="One is called (custom noun)">
+        <Input placeholder="media" value={value.noun} onChangeText={(v) => setWord('noun', v)}
+          autoCapitalize="none" accessibilityLabel="One is called (custom noun)" />
+      </Field>
+      <Field label="If not experienced">
+        <Input placeholder="Want to experience" value={value.wantLabel}
+          onChangeText={(v) => setWord('wantLabel', v)} accessibilityLabel="If not experienced" />
+      </Field>
+      <Field label="If done">
+        <Input placeholder="Experienced" value={value.doneLabel}
+          onChangeText={(v) => setWord('doneLabel', v)} accessibilityLabel="If done" />
+      </Field>
+      <Muted>For example: one is called a “movie”, if not experienced it’s “Want to watch”, and if done it’s “Watched”.</Muted>
     </View>
   );
 }

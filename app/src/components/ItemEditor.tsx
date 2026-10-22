@@ -17,6 +17,7 @@ import { Button, Chip, Input, Muted, styles } from './ui';
 
 export interface ItemDraft {
   title: string;
+  author: string;
   categoryUid: string;
   status: Status;
   rating: Rating | null;
@@ -50,7 +51,7 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
   const { categories, items } = useData();
   const shown = categories.filter((c) => !c.hidden || c.uid === item?.categoryUid);
   const [draft, setDraft] = useState<ItemDraft>(() => item ? { ...item } : {
-    title: '', categoryUid: shown[0]?.uid ?? '', status: 'want', rating: null, recommendedBy: '', note: '',
+    title: '', author: '', categoryUid: shown[0]?.uid ?? '', status: 'want', rating: null, recommendedBy: '', note: '',
     recommendedOn: today(), doneOn: null, ...start,
   });
   const [newCategory, setNewCategory] = useState<CategoryDraft | null>(null);
@@ -112,6 +113,8 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
       <Input placeholder="Title" value={draft.title} onChangeText={(title) => set({ title })}
         autoFocus={!item && !draft.title} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Title" />
       {duplicate && <Text style={{ color: colors.warm }}>Already on your list in this category.</Text>}
+      <Input placeholder="Author (or director, artist…), like Stephen King" value={draft.author}
+        onChangeText={(author) => set({ author })} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
 
       <View style={styles.chips}>
         {shown.map((c) => (
@@ -128,13 +131,6 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
             if (existing) { setNewCategory(null); set({ categoryUid: existing.uid }); }
           }} />
       )}
-
-      <View style={styles.chips}>
-        <Chip label={category?.wantLabel || 'Want to'} selected={draft.status === 'want'} color={colors.warm}
-          onPress={() => set({ status: 'want', rating: null })} />
-        <Chip label={category?.doneLabel || 'Done'} selected={draft.status === 'done'} color={colors.success}
-          onPress={() => set({ status: 'done', doneOn: draft.doneOn ?? today() })} />
-      </View>
 
       <View style={[styles.chips, { alignItems: 'center' }]}>
         <Text style={{ color: colors.muted, marginRight: space.xs }}>Your rating</Text>
@@ -155,6 +151,13 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
 
       <Input placeholder="Why? What did they say about it?" value={draft.note} onChangeText={(note) => set({ note })}
         multiline accessibilityLabel="Why it was recommended" />
+
+      <View style={styles.chips}>
+        <Chip label={category?.wantLabel || 'Want to'} selected={draft.status === 'want'} color={colors.warm}
+          onPress={() => set({ status: 'want', rating: null })} />
+        <Chip label={category?.doneLabel || 'Done'} selected={draft.status === 'done'} color={colors.success}
+          onPress={() => set({ status: 'done', doneOn: draft.doneOn ?? today() })} />
+      </View>
 
       <DateField label="Recommended on" value={draft.recommendedOn} onChange={(recommendedOn) => set({ recommendedOn })} />
       {draft.status === 'done' && (

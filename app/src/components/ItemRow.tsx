@@ -1,25 +1,20 @@
-// One recommendation in the list. Tap it to edit. Things still on your list have a "✓ Watched"
-// button: one tap marks it done (today), then the row asks how it was.
+// One recommendation in the list. Tap it to open it: that's where you mark it done and rate it.
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { formatDate } from '@/lib/dates';
 import { RATINGS, ratingEmoji } from '@/lib/rating';
 import { colors, radius, space } from '@/lib/theme';
-import type { Category, Item, Rating } from '@/lib/types';
-import { Chip } from './ui';
+import type { Category, Item } from '@/lib/types';
 
-export const ItemRow = memo(function ItemRow({ item, category, showCategory, asking, onPress, onDone, onRate }: {
+export const ItemRow = memo(function ItemRow({ item, category, showCategory, onPress }: {
   item: Item;
   category?: Category;
   showCategory: boolean;
-  /** Just marked done: show the rating buttons. */
-  asking: boolean;
   onPress: (item: Item) => void;
-  onDone: (item: Item) => void;
-  onRate: (item: Item, rating: Rating) => void;
 }) {
   const done = item.status === 'done';
   const meta = [
+    item.author && `by ${item.author}`,
     showCategory && category?.name,
     done ? `${category?.doneLabel ?? 'Done'}${item.doneOn ? ` ${formatDate(item.doneOn)}` : ''}` : category?.wantLabel,
     item.recommendedBy && `from ${item.recommendedBy}`,
@@ -42,20 +37,8 @@ export const ItemRow = memo(function ItemRow({ item, category, showCategory, ask
             </Text>
           )}
         </View>
-        {done ? (
-          item.rating ? <Text style={{ fontSize: 22 }} accessibilityLabel={RATINGS[item.rating - 1].label}>{ratingEmoji(item.rating)}</Text> : null
-        ) : (
-          <Chip label={`✓ ${category?.doneLabel ?? 'Done'}`} onPress={() => onDone(item)} />
-        )}
+        {item.rating ? <Text style={{ fontSize: 22 }} accessibilityLabel={RATINGS[item.rating - 1].label}>{ratingEmoji(item.rating)}</Text> : null}
       </View>
-      {asking && (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm, marginTop: space.sm }}>
-          <Text style={{ color: colors.muted }}>How was it?</Text>
-          {RATINGS.map((r) => (
-            <Chip key={r.value} label={`${r.emoji} ${r.label}`} selected={item.rating === r.value} onPress={() => onRate(item, r.value)} />
-          ))}
-        </View>
-      )}
     </Pressable>
   );
 });

@@ -47,6 +47,24 @@ export function suggestWords(name: string): Words {
     : { noun, wantLabel: 'Want to experience', doneLabel: 'Experienced' };
 }
 
+const sentence = (s: string) => {
+  const t = s.trim().replace(/\s+/g, ' ').toLowerCase();
+  return t ? t[0].toUpperCase() + t.slice(1) : '';
+};
+
+/**
+ * The words as saved, whatever capitals were typed: the noun in lowercase ("GAME" → "game"), the
+ * status words in sentence case ("want TO WATCH" → "Want to watch"). Empty ones are guessed from `name`.
+ */
+export function tidyWords(name: string, w: Partial<Words>): Words {
+  const guess = suggestWords(name);
+  return {
+    noun: w.noun?.trim().replace(/\s+/g, ' ').toLowerCase() || guess.noun,
+    wantLabel: sentence(w.wantLabel ?? '') || guess.wantLabel,
+    doneLabel: sentence(w.doneLabel ?? '') || guess.doneLabel,
+  };
+}
+
 /** "Movies" → "movie", "Stories" → "story"; leaves "series", "glass", "anime" alone. */
 function singular(w: string): string {
   if (/(series|news|ss|us)$/.test(w) || w.length < 4) return w;

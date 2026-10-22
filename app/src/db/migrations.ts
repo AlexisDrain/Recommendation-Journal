@@ -83,6 +83,15 @@ export const MIGRATIONS: string[] = [
   WHERE NOT EXISTS (SELECT 1 FROM items WHERE uid NOT LIKE 'example-%')
     AND EXISTS (SELECT 1 FROM items WHERE uid = 'example-godfather' AND deleted = 0);
   `,
+
+  // 4 — who made it: the author (or director, artist…), and the examples' authors
+  `
+  ALTER TABLE items ADD COLUMN author TEXT NOT NULL DEFAULT '';
+  -- updated_at stays as it was, so the examples still stay out of the Google Sheet unless edited.
+  UPDATE items SET author = 'Alexandre Dumas'      WHERE uid = 'example-monte-cristo' AND author = '';
+  UPDATE items SET author = 'Francis Ford Coppola' WHERE uid = 'example-godfather'    AND author = '';
+  UPDATE items SET author = 'Orson Welles'         WHERE uid = 'example-citizen-kane' AND author = '';
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase) {

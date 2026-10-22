@@ -41,11 +41,14 @@ For the web version alone: `npx expo start --web --port 8081 < /dev/null`.
   `DEFAULT_CATEGORIES`, so changing that list only affects new installs.)
 - **Everything is also kept in memory** ([`store.ts`](app/src/db/store.ts) `useData()`), so search
   and filters run as you type. Every write reloads it.
+- **A snapshot of that list** (`recjournal.snapshot.v1`, localStorage on the web, AsyncStorage on
+  phones) is shown the moment the app starts, because opening SQLite can take seconds in some
+  browsers. The database is opened as soon as the store loads and replaces the snapshot when read.
 - **Categories and items have a `uid`** that's the same on every synced device. The starter
   categories have fixed uids (`default-movie`…), so new devices pair up with the sheet's tabs.
 - **A new install starts with examples**: The Count of Monte Cristo and The Godfather (migration 2,
   only when there are no items yet) and Citizen Kane (migration 3, only while the list holds nothing
-  but the examples). Fixed uids (`example-…`) so devices share them, and `updated_at = ''` so they
+  but the examples); migration 4 adds the `author` column and the examples' authors. Fixed uids (`example-…`) so devices share them, and `updated_at = ''` so they
   stay out of the Google Sheet unless edited. To add another example later, append a migration
   like 3; don't edit shipped ones.
 - **Deleting keeps a tombstone** (`deleted = 1`) so the deletion reaches the sheet and other devices.

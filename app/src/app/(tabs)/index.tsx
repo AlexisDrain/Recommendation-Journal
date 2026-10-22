@@ -16,7 +16,7 @@ import { withArticle } from '@/lib/categories';
 import { useThemeName } from '@/lib/displayMode';
 import { hasTitle, search } from '@/lib/search';
 import { colors, radius, space } from '@/lib/theme';
-import type { Item, Rating, Status } from '@/lib/types';
+import type { Item, Status } from '@/lib/types';
 import { page, useWide, WIDE_PAGE } from '@/lib/useLayout';
 
 type Sort = 'newest' | 'title' | 'rating';
@@ -40,7 +40,6 @@ export default function ListScreen() {
   const [sort, setSort] = useState<Sort>('newest');
   const [editing, setEditing] = useState<Item | null>(null);
   const [adding, setAdding] = useState<Partial<ItemDraft> | null>(null);
-  const [asking, setAsking] = useState<string | null>(null); // uid of the item just marked done
   const [newCategory, setNewCategory] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const input = useRef<TextInput>(null);
@@ -57,13 +56,13 @@ export default function ListScreen() {
     [items, selected, hiddenUids],
   );
   const shown = useMemo(() => {
-    let list = search(inCategory, categories, query).filter((i) => status === 'all' || i.status === status || i.uid === asking);
+    let list = search(inCategory, categories, query).filter((i) => status === 'all' || i.status === status);
     if (!query) {
       if (sort === 'title') list = [...list].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
       if (sort === 'rating') list = [...list].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     }
     return list;
-  }, [inCategory, categories, query, status, sort, asking]);
+  }, [inCategory, categories, query, status, sort]);
   const perCategory = useMemo(() => {
     const m = new Map<string, number>([['all', 0]]);
     for (const i of items) {
@@ -88,14 +87,6 @@ export default function ListScreen() {
   });
 
   const onPress = useCallback((item: Item) => setEditing(item), []);
-  const onDone = useCallback((item: Item) => {
-    setAsking(item.uid);
-    store.items.update(item.uid, { status: 'done' }).catch((e) => setToast({ text: (e as Error).message }));
-  }, []);
-  const onRate = useCallback((item: Item, rating: Rating) => {
-    setAsking(null);
-    store.items.update(item.uid, { rating }).catch((e) => setToast({ text: (e as Error).message }));
-  }, []);
   const hideToast = useCallback(() => setToast(null), []);
 
   // Saving never waits for the Google Sheet. If a sync fails afterwards, say so once (a new
@@ -149,7 +140,7 @@ export default function ListScreen() {
 
       <View style={[styles.chips, { alignItems: 'center' }]}>
         {statusChip('all', 'All')}
-        {statusChip('want', `${selected?.wantLabel ?? 'On my list'} ${counts.want}`)}
+        {statusChip('want', `${selected?.wantLabel ?? 'Not experienced yet'} ${counts.want}`)}
         {statusChip('done', `${selected?.doneLabel ?? 'Done'} ${counts.done}`)}
         <View style={{ flex: 1 }} />
         <SyncChip />
@@ -191,7 +182,7 @@ export default function ListScreen() {
           ListHeaderComponent={header}
           renderItem={({ item }) => (
             <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected}
-              asking={asking === item.uid} onPress={onPress} onDone={onDone} onRate={onRate} />
+              onPress={onPress} />
           )}
           ListEmptyComponent={loaded ? (
             <View style={{ padding: space.xl, gap: space.sm, alignItems: 'center' }}>
