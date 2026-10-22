@@ -32,7 +32,7 @@
  * Bump this whenever the script changes in a way the app should know about. The app compares it
  * with the version it was built for and tells the user when their sheet's script is out of date.
  */
-const SCRIPT_VERSION = 1;
+const SCRIPT_VERSION = 2;
 
 const CATEGORIES_TAB = 'Categories';
 const DELETED_TAB = 'Deleted';
@@ -125,27 +125,86 @@ function doPost(e) {
  *
  * The answer's `aliases` maps a category id from the app to the sheet's own id for the same name
  * (a "Podcast" category made on two devices before they first synced becomes one).
+ *
+ * Every call into Google Sheets takes time, so a sync reads what it needs once (see context_),
+ * remembers what it already set up (columns, drop-downs, tab order) and only redoes it when
+ * something changed, and only reads the tabs that changed since the app's last sync.
  */
 function sync_(ss, req) {
-  const props = PropertiesService.getScriptProperties();
-  const cats = readCategories_(ss);
+  const ctx = context_(ss);
+  const read = readCategories_(ctx);
+  const cats = read.cats;
   const aliases = mergeCategories_(cats, req.categories || []);
-  adoptNewTabs_(ss, cats, props);
-  const tabs = ensureTabs_(ss, cats, props);
-  const written = applyItems_(ss, tabs, deadTabs_(ss, cats, props), req.items || [], aliases);
-  removeDeletedTabs_(ss, cats, props);
-  writeCategories_(ss, cats);
-  orderTabs_(ss, cats, tabs);
-  removeEmptyDefaultSheet_(ss);
+  adoptNewTabs_(ctx, cats);
+  const tabs = ensureTabs_(ctx, cats);
+  const written = applyItems_(ctx, tabs, deadTabs_(ctx, cats), req.items || [], aliases);
+  removeDeletedTabs_(ctx, cats);
+  if (JSON.stringify(categoryRows_(cats)) !== read.sig) writeCategories_(ctx, cats);
+  orderTabs_(ctx, cats, tabs);
+  removeEmptyDefaultSheet_(ctx);
 
   const out = { ok: true, written: written, aliases: aliases, categories: cats, sheet: ss.getName(), url: ss.getUrl(), version: SCRIPT_VERSION };
   if (req.pull) {
-    const pulled = pull_(ss, tabs, String(req.since || ''));
+    const pulled = pull_(ctx, tabs, String(req.since || ''), !!req.full);
     out.items = pulled.items;
     out.deleted = pulled.deleted;
     out.now = pulled.now;
   }
+  saveProps_(ctx);
   return out;
+}
+
+/**
+ * What a sync knows about the spreadsheet, read once: its tabs (with their ids and names) and the
+ * script's saved notes (which tab belongs to which category, what was already set up). Notes
+ * changed during the sync are saved together at the end.
+ */
+function context_(ss) {
+  const store = PropertiesService.getScriptProperties();
+  return {
+    ss: ss,
+    store: store,
+    props: store.getProperties(),
+    changed: {},
+    sheets: ss.getSheets().map(function (sh) { return { sh: sh, id: String(sh.getSheetId()), name: sh.getName() }; }),
+  };
+}
+
+function prop_(ctx, key) {
+  return ctx.props[key] === undefined ? null : ctx.props[key];
+}
+
+function setProp_(ctx, key, value) {
+  value = String(value);
+  if (ctx.props[key] === value) return;
+  ctx.props[key] = value;
+  ctx.changed[key] = value;
+}
+
+function deleteProp_(ctx, key) {
+  if (ctx.props[key] === undefined) return;
+  delete ctx.props[key];
+  delete ctx.changed[key];
+  ctx.store.deleteProperty(key);
+}
+
+function saveProps_(ctx) {
+  if (Object.keys(ctx.changed).length) ctx.store.setProperties(ctx.changed);
+}
+
+function tabById_(ctx, id) {
+  return id ? ctx.sheets.filter(function (t) { return t.id === String(id); })[0] || null : null;
+}
+
+function tabByName_(ctx, name) {
+  return ctx.sheets.filter(function (t) { return t.name === name; })[0] || null;
+}
+
+function insertTab_(ctx, name) {
+  const sh = ctx.ss.insertSheet(name, ctx.sheets.length);
+  const t = { sh: sh, id: String(sh.getSheetId()), name: name };
+  ctx.sheets.push(t);
+  return t;
 }
 
 // ---------- categories ----------
@@ -167,11 +226,15 @@ function category_(id, name, noun, want, done, order, hidden, deleted, updated) 
   };
 }
 
-function readCategories_(ss) {
-  const sh = ss.getSheetByName(CATEGORIES_TAB);
-  if (!sh || sh.getLastRow() < 2) return [];
+/** The Categories tab's rows, and how they looked (so it's only rewritten when something changed). */
+function readCategories_(ctx) {
+  const t = tabByName_(ctx, CATEGORIES_TAB);
+  if (!t) return { cats: [], sig: '' };
+  const values = t.sh.getDataRange().getDisplayValues().slice(1)
+    .filter(function (r) { return r.some(function (v) { return v !== ''; }); })
+    .map(function (r) { return r.slice(0, CAT_COLS.length); });
   const cats = [];
-  sh.getRange(2, 1, sh.getLastRow() - 1, CAT_COLS.length).getValues().forEach(function (r) {
+  values.forEach(function (r) {
     const c = category_(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8]);
     if (!c) return;
     if (!c.id) { // a row typed in by hand: give it an id so it can sync
@@ -180,7 +243,7 @@ function readCategories_(ss) {
     }
     cats.push(c);
   });
-  return cats;
+  return { cats: cats, sig: JSON.stringify(values) };
 }
 
 /** The app's categories → this list. Per category, the newest edit wins. Returns the aliases. */
@@ -208,73 +271,96 @@ function mergeCategories_(cats, incoming) {
   return aliases;
 }
 
-/** A tab you added by hand with a "Title" header becomes a category (the app fills in its words). */
-function adoptNewTabs_(ss, cats, props) {
+/**
+ * A tab you added by hand with a "Title" header becomes a category (the app fills in its words).
+ * A tab that isn't one is remembered by its width, so it's only looked at again when that changes.
+ */
+function adoptNewTabs_(ctx, cats) {
   const claimed = {};
   cats.forEach(function (c) {
     claimed['name:' + c.name] = true;
-    const id = props.getProperty('TAB_' + c.id);
+    const id = prop_(ctx, 'TAB_' + c.id);
     if (id) claimed['id:' + id] = true;
   });
   let order = cats.reduce(function (m, c) { return Math.max(m, c.order); }, 0);
-  ss.getSheets().forEach(function (sh) {
-    const name = sh.getName();
-    if (name === CATEGORIES_TAB || name === DELETED_TAB || claimed['id:' + sh.getSheetId()] || claimed['name:' + name]) return;
-    if (!sh.getLastColumn() || headers_(sh).indexOf('Title') < 0) return;
-    cats.push({ id: newId_(), name: name, noun: '', want: '', done: '', order: ++order, hidden: false, deleted: false, updated: nowIso_() });
+  ctx.sheets.forEach(function (t) {
+    if (t.name === CATEGORIES_TAB || t.name === DELETED_TAB || claimed['id:' + t.id] || claimed['name:' + t.name]) return;
+    const width = t.sh.getLastColumn();
+    if (prop_(ctx, 'NOTCAT_' + t.id) === String(width)) return;
+    if (!width || headers_(t.sh).indexOf('Title') < 0) {
+      setProp_(ctx, 'NOTCAT_' + t.id, width);
+      return;
+    }
+    cats.push({ id: newId_(), name: t.name, noun: '', want: '', done: '', order: ++order, hidden: false, deleted: false, updated: nowIso_() });
   });
 }
 
 /**
  * Finds (or creates) the tab of every category that isn't deleted, keeping tab and category
  * names in step: a name changed in the app renames the tab, and a tab renamed by hand renames
- * the category. Returns { categoryId: sheet }.
+ * the category. Returns { categoryId: tab }.
  */
-function ensureTabs_(ss, cats, props) {
+function ensureTabs_(ctx, cats) {
   const tabs = {};
   cats.forEach(function (c) {
     if (c.deleted) return;
-    let sh = sheetById_(ss, props.getProperty('TAB_' + c.id)) || ss.getSheetByName(c.name);
-    if (!sh) sh = newItemSheet_(ss, uniqueName_(ss, c.name));
-    const known = props.getProperty('TABNAME_' + c.id);
-    if (known && sh.getName() !== known && sh.getName() !== c.name) {
-      c.name = sh.getName(); // renamed by hand in the sheet
+    let t = tabById_(ctx, prop_(ctx, 'TAB_' + c.id)) || tabByName_(ctx, c.name);
+    if (!t) t = newItemTab_(ctx, uniqueName_(ctx, c.name));
+    const known = prop_(ctx, 'TABNAME_' + c.id);
+    if (known && t.name !== known && t.name !== c.name) {
+      c.name = t.name; // renamed by hand in the sheet
       c.updated = nowIso_();
-    } else if (sh.getName() !== c.name && !ss.getSheetByName(c.name)) {
-      sh.setName(c.name);
+    } else if (t.name !== c.name && !tabByName_(ctx, c.name)) {
+      t.sh.setName(c.name);
+      t.name = c.name;
     }
-    props.setProperty('TAB_' + c.id, String(sh.getSheetId()));
-    props.setProperty('TABNAME_' + c.id, sh.getName());
-    ensureItemColumns_(sh);
-    applyChoices_(sh, c, props);
-    if (c.hidden && !sh.isSheetHidden()) sh.hideSheet();
-    if (!c.hidden && sh.isSheetHidden()) sh.showSheet();
-    tabs[c.id] = sh;
+    setProp_(ctx, 'TAB_' + c.id, t.id);
+    setProp_(ctx, 'TABNAME_' + c.id, t.name);
+    // Columns, drop-downs and hiding: only when the category's words or "hidden" changed.
+    const layout = JSON.stringify([2, c.want, c.done, c.hidden]);
+    if (prop_(ctx, 'LAYOUT_' + t.id) !== layout) {
+      ensureItemColumns_(t.sh);
+      applyChoices_(t.sh, c);
+      if (c.hidden && !t.sh.isSheetHidden()) t.sh.hideSheet();
+      if (!c.hidden && t.sh.isSheetHidden()) t.sh.showSheet();
+      setProp_(ctx, 'LAYOUT_' + t.id, layout);
+    }
+    tabs[c.id] = t;
   });
   return tabs;
 }
 
 /** A deleted category's tab goes away once it's empty (its rows are removed as their deletions arrive). */
-function removeDeletedTabs_(ss, cats, props) {
+function removeDeletedTabs_(ctx, cats) {
   cats.forEach(function (c) {
     if (!c.deleted) return;
-    const sh = sheetById_(ss, props.getProperty('TAB_' + c.id));
-    if (!sh) return;
-    if (sh.getLastRow() < 2 && ss.getSheets().length > 1) {
-      ss.deleteSheet(sh);
-      props.deleteProperty('TAB_' + c.id);
-      props.deleteProperty('TABNAME_' + c.id);
-    } else if (!sh.isSheetHidden()) {
-      sh.hideSheet();
+    const t = tabById_(ctx, prop_(ctx, 'TAB_' + c.id));
+    if (!t) return;
+    if (t.sh.getLastRow() < 2 && ctx.sheets.length > 1) {
+      ctx.ss.deleteSheet(t.sh);
+      ctx.sheets = ctx.sheets.filter(function (x) { return x !== t; });
+      deleteProp_(ctx, 'TAB_' + c.id);
+      deleteProp_(ctx, 'TABNAME_' + c.id);
+    } else if (!t.sh.isSheetHidden()) {
+      t.sh.hideSheet();
     }
   });
 }
 
-function writeCategories_(ss, cats) {
-  let sh = ss.getSheetByName(CATEGORIES_TAB);
+function categoryRows_(cats) {
+  return cats.slice().sort(function (a, b) {
+    return a.deleted !== b.deleted ? (a.deleted ? 1 : -1) : a.order - b.order;
+  }).map(function (c) {
+    return [c.id, c.name, c.noun, c.want, c.done, String(c.order), c.hidden ? 'yes' : '', c.deleted ? 'yes' : '', c.updated];
+  });
+}
+
+function writeCategories_(ctx, cats) {
+  let t = tabByName_(ctx, CATEGORIES_TAB);
   const n = CAT_COLS.length;
-  if (!sh) {
-    sh = ss.insertSheet(CATEGORIES_TAB, ss.getSheets().length);
+  if (!t) {
+    t = insertTab_(ctx, CATEGORIES_TAB);
+    const sh = t.sh;
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, n).setValues([CAT_COLS]).setFontWeight('bold').setBackground(HEADER_COLOR);
     sh.getRange(1, 1).setNote(
@@ -286,45 +372,41 @@ function writeCategories_(ss, cats) {
     sh.setColumnWidths(3, 3, 140);
     sh.setColumnWidth(9, 160);
   }
-  const sorted = cats.slice().sort(function (a, b) {
-    return a.deleted !== b.deleted ? (a.deleted ? 1 : -1) : a.order - b.order;
-  });
-  const old = sh.getLastRow() - 1;
-  if (old > 0) sh.getRange(2, 1, old, n).clearContent();
-  if (!sorted.length) return;
-  ensureRows_(sh, sorted.length + 1);
-  sh.getRange(2, 1, sorted.length, n).setValues(sorted.map(function (c) {
-    return [c.id, c.name, c.noun, c.want, c.done, String(c.order), c.hidden ? 'yes' : '', c.deleted ? 'yes' : '', c.updated];
-  }));
+  const rows = categoryRows_(cats);
+  const old = t.sh.getLastRow() - 1;
+  if (old > 0) t.sh.getRange(2, 1, old, n).clearContent();
+  if (!rows.length) return;
+  ensureRows_(t.sh, rows.length + 1);
+  t.sh.getRange(2, 1, rows.length, n).setValues(rows);
 }
 
-/** Visible category tabs first, in the app's order, then Categories. */
-function orderTabs_(ss, cats, tabs) {
+/** Visible category tabs first, in the app's order, then Categories. Only when that order changed. */
+function orderTabs_(ctx, cats, tabs) {
   const wanted = cats
     .filter(function (c) { return !c.deleted && !c.hidden && tabs[c.id]; })
     .sort(function (a, b) { return a.order - b.order; })
     .map(function (c) { return tabs[c.id]; });
-  const list = ss.getSheetByName(CATEGORIES_TAB);
+  const list = tabByName_(ctx, CATEGORIES_TAB);
   if (list) wanted.push(list);
-  const active = ss.getActiveSheet();
+  const sig = wanted.map(function (t) { return t.id; }).join(',');
+  if (prop_(ctx, 'TAB_ORDER') === sig) return;
+  const active = ctx.ss.getActiveSheet();
   let moved = false;
-  wanted.forEach(function (sh, i) {
-    if (sh.getIndex() !== i + 1) {
-      ss.setActiveSheet(sh);
-      ss.moveActiveSheet(i + 1);
+  wanted.forEach(function (t, i) {
+    if (t.sh.getIndex() !== i + 1) {
+      ctx.ss.setActiveSheet(t.sh);
+      ctx.ss.moveActiveSheet(i + 1);
       moved = true;
     }
   });
-  if (moved && active && !active.isSheetHidden()) ss.setActiveSheet(active);
+  if (moved && active && !active.isSheetHidden()) ctx.ss.setActiveSheet(active);
+  setProp_(ctx, 'TAB_ORDER', sig);
 }
 
 /** Status and Rating get drop-down lists (typing something else is still allowed). */
-function applyChoices_(sh, c, props) {
-  const key = 'CHOICES_' + sh.getSheetId();
+function applyChoices_(sh, c) {
   const want = c.want || 'Want to experience';
   const done = c.done || 'Experienced';
-  const wanted = JSON.stringify([want, done, RATINGS]);
-  if (props.getProperty(key) === wanted) return;
   const headers = headers_(sh);
   const rows = Math.max(sh.getMaxRows() - 1, 1);
   const status = headers.indexOf('Status') + 1;
@@ -337,46 +419,57 @@ function applyChoices_(sh, c, props) {
     sh.getRange(2, rating, rows, 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(RATINGS, true).setAllowInvalid(true).build());
   }
-  props.setProperty(key, wanted);
 }
 
 // ---------- recommendations ----------
 
 /** The tabs of deleted categories that are still there (their rows can still be removed). */
-function deadTabs_(ss, cats, props) {
+function deadTabs_(ctx, cats) {
   const dead = [];
   cats.forEach(function (c) {
-    const sh = c.deleted && sheetById_(ss, props.getProperty('TAB_' + c.id));
-    if (sh) dead.push(sh);
+    const t = c.deleted && tabById_(ctx, prop_(ctx, 'TAB_' + c.id));
+    if (t) dead.push(t);
   });
   return dead;
 }
 
+/**
+ * A tab in one read: { headers, col: { header: index }, data: [rows below the header] }.
+ * `shown`: the text as you see it, instead of the stored values. Puts back any missing columns.
+ */
+function readTab_(t, shown) {
+  const get = function () { return shown ? t.sh.getDataRange().getDisplayValues() : t.sh.getDataRange().getValues(); };
+  let all = get();
+  let headers = (all[0] || []).map(function (h) { return String(h).trim(); });
+  if (ITEM_COLS.some(function (h) { return headers.indexOf(h) < 0; })) {
+    ensureItemColumns_(t.sh);
+    all = get();
+    headers = all[0].map(function (h) { return String(h).trim(); });
+  }
+  const col = {};
+  headers.forEach(function (h, i) { if (col[h] === undefined) col[h] = i; });
+  return { headers: headers, col: col, data: all.slice(1) };
+}
+
+const isBlank_ = function (row) { return row.every(function (v) { return v === ''; }); };
+
 /** App → sheet. Returns how many rows were written or removed. */
-function applyItems_(ss, tabs, dead, items, aliases) {
+function applyItems_(ctx, tabs, dead, items, aliases) {
   if (!items.length) return 0;
   const tables = {};
-  const load = function (sh) {
-    const id = sh.getSheetId();
-    if (!tables[id]) {
-      const headers = headers_(sh);
-      const col = {};
-      headers.forEach(function (h, i) { col[h] = i; });
-      const rows = sh.getLastRow() - 1;
-      tables[id] = {
-        sh: sh, headers: headers, col: col, oldRows: Math.max(rows, 0),
-        data: rows > 0 ? sh.getRange(2, 1, rows, headers.length).getValues() : [],
-        remove: {}, dirty: false,
-      };
+  const load = function (t) {
+    if (!tables[t.id]) {
+      const r = readTab_(t, false);
+      tables[t.id] = { t: t, headers: r.headers, col: r.col, data: r.data, oldRows: r.data.length, remove: {}, dirty: false };
     }
-    return tables[id];
+    return tables[t.id];
   };
   const where = {};
-  Object.keys(tabs).map(function (catId) { return tabs[catId]; }).concat(dead).forEach(function (sh) {
-    const t = load(sh);
-    t.data.forEach(function (row, i) {
-      const id = String(row[t.col.Id] || '').trim();
-      if (id) where[id] = { t: t, i: i };
+  Object.keys(tabs).map(function (catId) { return tabs[catId]; }).concat(dead).forEach(function (t) {
+    const tb = load(t);
+    tb.data.forEach(function (row, i) {
+      const id = String(row[tb.col.Id] || '').trim();
+      if (id) where[id] = { t: tb, i: i };
     });
   });
 
@@ -397,64 +490,68 @@ function applyItems_(ss, tabs, dead, items, aliases) {
     }
     const target = tabs[aliases[it.category] || it.category];
     if (!target) return; // its category was deleted
-    const t = load(target);
+    const tb = load(target);
     let row;
-    if (at && at.t === t && !at.t.remove[at.i]) {
-      row = t.data[at.i];
+    if (at && at.t === tb && !at.t.remove[at.i]) {
+      row = tb.data[at.i];
     } else {
       if (at) { // moved to another category: the row moves to that tab
         at.t.remove[at.i] = true;
         at.t.dirty = true;
       }
-      row = t.headers.map(function () { return ''; });
-      t.data.push(row);
-      where[it.id] = { t: t, i: t.data.length - 1 };
+      row = tb.headers.map(function () { return ''; });
+      tb.data.push(row);
+      where[it.id] = { t: tb, i: tb.data.length - 1 };
     }
     Object.keys(it.values || {}).forEach(function (h) {
-      if (t.col[h] !== undefined) row[t.col[h]] = it.values[h] === null || it.values[h] === undefined ? '' : String(it.values[h]);
+      if (tb.col[h] !== undefined) row[tb.col[h]] = it.values[h] === null || it.values[h] === undefined ? '' : String(it.values[h]);
     });
-    row[t.col.Id] = it.id;
-    row[t.col[UPDATED]] = it.updated;
-    row[t.col[CHANGED]] = now;
-    t.dirty = true;
+    row[tb.col.Id] = it.id;
+    row[tb.col[UPDATED]] = it.updated;
+    row[tb.col[CHANGED]] = now;
+    tb.dirty = true;
     written++;
   });
 
   Object.keys(tables).forEach(function (id) {
-    const t = tables[id];
-    if (!t.dirty) return;
-    const data = t.data.filter(function (_, i) { return !t.remove[i]; });
-    if (t.oldRows > 0) t.sh.getRange(2, 1, t.oldRows, t.headers.length).clearContent();
+    const tb = tables[id];
+    if (!tb.dirty) return;
+    const data = tb.data.filter(function (row, i) { return !tb.remove[i] && !isBlank_(row); });
+    if (tb.oldRows > 0) tb.t.sh.getRange(2, 1, tb.oldRows, tb.headers.length).clearContent();
     if (data.length) {
-      ensureRows_(t.sh, data.length + 1);
-      t.sh.getRange(2, 1, data.length, t.headers.length).setValues(data);
+      ensureRows_(tb.t.sh, data.length + 1);
+      tb.t.sh.getRange(2, 1, data.length, tb.headers.length).setValues(data);
     }
+    setProp_(ctx, 'CHANGED_' + id, now);
   });
   if (log.length) {
-    const sh = deletedSheet_(ss);
+    const sh = deletedTab_(ctx).sh;
     ensureRows_(sh, sh.getLastRow() + log.length);
     sh.getRange(sh.getLastRow() + 1, 1, log.length, 3).setValues(log);
+    setProp_(ctx, 'CHANGED_' + DELETED_TAB, now);
   }
   return written;
 }
 
 /**
  * Sheet → app: every row changed since `since` (by the hidden "Changed" column), as the text you
- * see in the sheet, plus the deletions logged since then.
+ * see in the sheet, plus the deletions logged since then. A tab nothing has touched since then
+ * (the script notes when it, or a hand edit, last changed each tab) isn't read at all, unless the
+ * app asks for a `full` look (it does on its first sync after opening, in case a hand edit's note
+ * went missing).
  */
-function pull_(ss, tabs, since) {
+function pull_(ctx, tabs, since, full) {
   const now = nowIso_();
   const items = [];
   Object.keys(tabs).forEach(function (catId) {
-    const sh = tabs[catId];
-    if (sh.getLastRow() < 2) return;
-    const headers = headers_(sh);
-    const col = {};
-    headers.forEach(function (h, i) { col[h] = i; });
-    const range = sh.getRange(2, 1, sh.getLastRow() - 1, headers.length);
-    const shown = range.getDisplayValues();
+    const t = tabs[catId];
+    const touched = prop_(ctx, 'CHANGED_' + t.id);
+    if (!full && touched !== null && touched < since) return;
+    const tb = readTab_(t, true);
+    const col = tb.col;
     let fixed = false;
-    shown.forEach(function (row) {
+    let newest = '';
+    tb.data.forEach(function (row) {
       if (!String(row[col.Title] || '').trim()) return;
       if (!String(row[col.Id] || '').trim()) { // a row typed in by hand: give it an id so it can sync
         row[col.Id] = newId_();
@@ -463,26 +560,26 @@ function pull_(ss, tabs, since) {
         fixed = true;
       }
       const changed = toIsoTime_(row[col[CHANGED]]) || now;
+      if (changed > newest) newest = changed;
       if (changed < since) return;
       const cells = {};
-      headers.forEach(function (h, i) { if (h) cells[h] = row[i]; });
+      tb.headers.forEach(function (h, i) { if (h) cells[h] = row[i]; });
       items.push({ id: row[col.Id], category: catId, updated: toIsoTime_(row[col[UPDATED]]) || now, cells: cells });
     });
-    if (fixed) {
-      const ids = shown.map(function (r) { return [r[col.Id], r[col[UPDATED]], r[col[CHANGED]]]; });
-      // Id, Updated and Changed are next to each other (ensureItemColumns_ adds them together).
-      if (col[UPDATED] === col.Id + 1 && col[CHANGED] === col.Id + 2) sh.getRange(2, col.Id + 1, ids.length, 3).setValues(ids);
-      else {
-        [col.Id, col[UPDATED], col[CHANGED]].forEach(function (c, k) {
-          sh.getRange(2, c + 1, ids.length, 1).setValues(ids.map(function (r) { return [r[k]]; }));
-        });
-      }
+    if (fixed && tb.data.length) {
+      // tb.data lines up with the sheet's rows 2, 3…, so the three columns go back in one write each.
+      [col.Id, col[UPDATED], col[CHANGED]].forEach(function (c) {
+        t.sh.getRange(2, c + 1, tb.data.length, 1).setValues(tb.data.map(function (r) { return [r[c]]; }));
+      });
     }
+    // Remember when this tab last changed, so the next syncs can skip it while nothing happens.
+    if (touched === null || newest > touched) setProp_(ctx, 'CHANGED_' + t.id, newest || now);
   });
   const deleted = [];
-  const log = ss.getSheetByName(DELETED_TAB);
-  if (log && log.getLastRow() > 1) {
-    log.getRange(2, 1, log.getLastRow() - 1, 3).getDisplayValues().forEach(function (r) {
+  const log = tabByName_(ctx, DELETED_TAB);
+  const logTouched = prop_(ctx, 'CHANGED_' + DELETED_TAB);
+  if (log && (full || logTouched === null || logTouched >= since) && log.sh.getLastRow() > 1) {
+    log.sh.getRange(2, 1, log.sh.getLastRow() - 1, 3).getDisplayValues().forEach(function (r) {
       if (r[0] && toIsoTime_(r[2]) >= since) deleted.push({ id: r[0], updated: toIsoTime_(r[1]) });
     });
   }
@@ -509,15 +606,17 @@ function onEdit(e) {
   for (let i = 0; i < n; i++) stamps.push([nowIso_()]);
   sh.getRange(e.range.getRow(), u + 1, n, 1).setValues(stamps);
   if (c >= 0) sh.getRange(e.range.getRow(), c + 1, n, 1).setValues(stamps);
+  // Tells the next sync this tab has something new (it skips tabs nothing has touched).
+  PropertiesService.getScriptProperties().setProperty('CHANGED_' + sh.getSheetId(), stamps[0][0]);
 }
 
 // ---------- sheet layout ----------
 
-function newItemSheet_(ss, name) {
-  const sh = ss.insertSheet(name, ss.getSheets().length);
-  sh.setFrozenRows(1);
-  sh.setFrozenColumns(1);
-  return sh;
+function newItemTab_(ctx, name) {
+  const t = insertTab_(ctx, name);
+  t.sh.setFrozenRows(1);
+  t.sh.setFrozenColumns(1);
+  return t;
 }
 
 /** Adds any missing columns at the end (your own columns stay where they are), as plain text. */
@@ -545,29 +644,23 @@ function headers_(sh) {
   return n ? sh.getRange(1, 1, 1, n).getValues()[0].map(function (h) { return String(h).trim(); }) : [];
 }
 
-function deletedSheet_(ss) {
-  let sh = ss.getSheetByName(DELETED_TAB);
-  if (!sh) {
-    sh = ss.insertSheet(DELETED_TAB, ss.getSheets().length);
+function deletedTab_(ctx) {
+  let t = tabByName_(ctx, DELETED_TAB);
+  if (!t) {
+    t = insertTab_(ctx, DELETED_TAB);
+    const sh = t.sh;
     sh.getRange(1, 1, 1, 3).setValues([['Id', 'Deleted at', 'Logged']]).setFontWeight('bold');
     sh.getRange(1, 1).setNote('Recommendations deleted in the app, so your other devices delete them too. Safe to ignore.');
     sh.getRange(2, 1, Math.max(sh.getMaxRows() - 1, 1), 3).setNumberFormat('@');
     sh.hideSheet();
   }
-  return sh;
-}
-
-function sheetById_(ss, id) {
-  if (!id) return null;
-  const all = ss.getSheets();
-  for (let i = 0; i < all.length; i++) if (String(all[i].getSheetId()) === String(id)) return all[i];
-  return null;
+  return t;
 }
 
 /** Tab names must be unique: "Poem", then "Poem (2)"… */
-function uniqueName_(ss, name) {
+function uniqueName_(ctx, name) {
   let n = name;
-  for (let i = 2; ss.getSheetByName(n); i++) n = name + ' (' + i + ')';
+  for (let i = 2; tabByName_(ctx, n); i++) n = name + ' (' + i + ')';
   return n;
 }
 
@@ -576,9 +669,11 @@ function ensureRows_(sh, rows) {
 }
 
 /** A brand-new spreadsheet starts with an empty "Sheet1"; drop it once category tabs exist. */
-function removeEmptyDefaultSheet_(ss) {
-  const s = ss.getSheetByName('Sheet1');
-  if (s && s.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(s);
+function removeEmptyDefaultSheet_(ctx) {
+  const t = tabByName_(ctx, 'Sheet1');
+  if (!t || ctx.sheets.length < 2 || t.sh.getLastRow() !== 0) return;
+  ctx.ss.deleteSheet(t.sh);
+  ctx.sheets = ctx.sheets.filter(function (x) { return x !== t; });
 }
 
 // ---------- helpers ----------

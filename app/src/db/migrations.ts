@@ -54,6 +54,35 @@ export const MIGRATIONS: string[] = [
   INSERT INTO categories (uid, name, noun, want_label, done_label, sort_order) VALUES
     ${DEFAULT_CATEGORIES.map((c, i) => `(${[c.uid, c.name, c.noun, c.wantLabel, c.doneLabel].map(quote).join(', ')}, ${i + 1})`).join(',\n    ')};
   `,
+
+  // 2 — two examples for a new user, so the list isn't empty: one on the list, one done and rated
+  `
+  -- Only on a new install (nothing saved yet). The uids are fixed, like the starter categories', so
+  -- every device has the same two: deleting them on one device deletes them on the others through
+  -- the Google Sheet. updated_at '' keeps them out of the sheet unless you edit them.
+  INSERT INTO items (uid, category_uid, title, status, rating, recommended_by, note, recommended_on, done_on, updated_at)
+  SELECT * FROM (VALUES
+    ('example-monte-cristo', 'default-fiction', 'The Count of Monte Cristo', 'want', NULL, 'a friend',
+     'A revenge story worth all of its 1,200 pages. (This is an example: delete it once you''ve added your own.)',
+     date('now', 'localtime'), NULL, ''),
+    ('example-godfather', 'default-movie', 'The Godfather', 'done', 4, 'Dad',
+     'Said it''s the best movie ever made. (This is an example: delete it once you''ve added your own.)',
+     date('now', 'localtime'), date('now', 'localtime'), '')
+  )
+  WHERE NOT EXISTS (SELECT 1 FROM items);
+  `,
+
+  // 3 — a third example: a movie still on the list
+  `
+  -- Only while the list holds nothing but the examples (a new install, or someone still looking
+  -- around), and only if the examples weren't deleted. Same rules as migration 2.
+  INSERT INTO items (uid, category_uid, title, status, rating, recommended_by, note, recommended_on, done_on, updated_at)
+  SELECT 'example-citizen-kane', 'default-movie', 'Citizen Kane', 'want', NULL, 'my film teacher',
+         'Often called the greatest film ever made. (This is an example: delete it once you''ve added your own.)',
+         date('now', 'localtime'), NULL, ''
+  WHERE NOT EXISTS (SELECT 1 FROM items WHERE uid NOT LIKE 'example-%')
+    AND EXISTS (SELECT 1 FROM items WHERE uid = 'example-godfather' AND deleted = 0);
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase) {

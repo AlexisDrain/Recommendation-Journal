@@ -43,6 +43,11 @@ For the web version alone: `npx expo start --web --port 8081 < /dev/null`.
   and filters run as you type. Every write reloads it.
 - **Categories and items have a `uid`** that's the same on every synced device. The starter
   categories have fixed uids (`default-movie`…), so new devices pair up with the sheet's tabs.
+- **A new install starts with examples**: The Count of Monte Cristo and The Godfather (migration 2,
+  only when there are no items yet) and Citizen Kane (migration 3, only while the list holds nothing
+  but the examples). Fixed uids (`example-…`) so devices share them, and `updated_at = ''` so they
+  stay out of the Google Sheet unless edited. To add another example later, append a migration
+  like 3; don't edit shipped ones.
 - **Deleting keeps a tombstone** (`deleted = 1`) so the deletion reaches the sheet and other devices.
 - **Dates** are text: `2026-10-21`, or `2026-10` / `2026` when that's all that's known.
   **Updated** times are UTC (`2026-10-21T18:30:00Z`) and compare as text: the newest edit wins.
@@ -56,6 +61,17 @@ its categories and the items changed since the last sync; the script merges them
 hidden **Changed** column (the sheet's own clock) is at or after the app's last pull. Using the
 sheet's clock for "what's new" means a device that syncs late never makes another device miss its
 edits. A category made on two devices before they first synced is merged by name (`aliases`).
+
+Saving never waits for the sheet: changes are saved on the device, and the sync follows a few
+seconds later in the background (a change made during a sync goes out right after it). A failed
+sync shows a message on the list with Retry, and "⚠ Sync failed" on the Sync button.
+
+Every call into Google Sheets is slow (often 0.1 s or more), so the script keeps them few: it
+reads the tabs and its saved notes once per sync (`context_`), only redoes tab layout (columns,
+drop-downs, hiding, order) when that changed, only rewrites the Categories tab when it changed,
+and only reads tabs touched since the app's last sync (`CHANGED_<tab>` notes, set when the script
+writes a tab and by `onEdit`). The app's first sync after opening sends `full: true` to read every
+tab anyway, in case an edit's note went missing. A sync with nothing to send is ~20 calls.
 
 ## Releasing
 

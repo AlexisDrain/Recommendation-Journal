@@ -7,6 +7,7 @@
 //
 // The connection (script URL + secret key) is kept in the device's secure storage.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSyncExternalStore } from 'react';
 import { suggestWords } from '@/lib/categories';
 import { stamp } from '@/lib/dates';
 import { secureStorage } from '@/lib/secureStorage';
@@ -19,7 +20,7 @@ const CONNECTION_KEY = 'recjournal.sheetConnection';
 const STATE_KEY = 'recjournal.sheetSync.v1';
 const PUSH_BATCH = 300;
 /** The version of google-sheets/RecommendationJournalSync.gs this app was built for (its SCRIPT_VERSION). */
-export const LATEST_SCRIPT_VERSION = 1;
+export const LATEST_SCRIPT_VERSION = 2;
 
 export interface Connection { url: string; secret: string }
 
@@ -132,6 +133,7 @@ export async function connect(urlInput: string, keyInput = ''): Promise<string> 
 export async function disconnect() {
   await secureStorage.remove(CONNECTION_KEY);
   await AsyncStorage.removeItem(STATE_KEY);
+  setStatus({ running: false, error: null });
 }
 
 // ---------- what goes over the wire ----------
@@ -162,13 +164,61 @@ export function onPulled(fn: () => void): () => void {
   return () => pulledListeners.delete(fn);
 }
 
-let running: Promise<{ pushed: number; pulled: number }> | null = null;
+// ---------- running it ----------
 
-/** Send then receive. Concurrent calls share one run. */
-export function syncNow(): Promise<{ pushed: number; pulled: number }> {
-  running ??= runSync().finally(() => {
-    running = null;
-  });
+/** Whether a sync is going on right now, and why the last one failed (null once one succeeds). */
+export interface SyncStatus { running: boolean; error: string | null }
+let status: SyncStatus = { running: false, error: null };
+const statusListeners = new Set<() => void>();
+function setStatus(next: SyncStatus) {
+  status = next;
+  statusListeners.forEach((fn) => fn());
+}
+
+/** The sync status; the screen redraws when it changes. */
+export function useSyncStatus(): SyncStatus {
+  return useSyncExternalStore(
+    (fn) => (statusListeners.add(fn), () => void statusListeners.delete(fn)),
+    () => status,
+    () => status,
+  );
+}
+
+type Result = { pushed: number; pulled: number };
+let running: Promise<Result> | null = null;
+let again = false;
+/** The first sync after the app opens asks the sheet to look at every tab (see pull_ in the script). */
+let lookedAtEverything = false;
+
+/**
+ * Send then receive, in the background: everything is already saved on this device, the sheet
+ * just catches up. A call while a sync is running doesn't start a second one at the same time:
+ * the running one goes round once more when it's done, so changes made meanwhile go out too.
+ */
+export function syncNow(): Promise<Result> {
+  if (running) {
+    again = true;
+    return running;
+  }
+  running = (async () => {
+    setStatus({ running: true, error: status.error });
+    try {
+      let result = await runSync();
+      while (again) {
+        again = false;
+        const next = await runSync();
+        result = { pushed: result.pushed + next.pushed, pulled: result.pulled + next.pulled };
+      }
+      setStatus({ running: false, error: null });
+      return result;
+    } catch (e) {
+      setStatus({ running: false, error: (e as Error).message });
+      throw e;
+    } finally {
+      running = null;
+      again = false;
+    }
+  })();
   return running;
 }
 
@@ -194,6 +244,7 @@ async function runSync() {
         items: sent.slice(i, i + PUSH_BATCH),
         since: state.lastPulled,
         pull: last,
+        full: !lookedAtEverything,
       });
     }
     const pulled = await applyAnswer(answer!);
@@ -203,6 +254,7 @@ async function runSync() {
     if (answer!.sheet) state.sheetName = answer!.sheet; // the sheet may have been renamed
     state.sheetUrl = sheetAddress(answer!.url) ?? state.sheetUrl;
     await saveState({ ...state, lastSyncAt: new Date().toISOString(), lastError: null });
+    lookedAtEverything = true;
     if (pulled) {
       await reload();
       pulledListeners.forEach((fn) => fn());

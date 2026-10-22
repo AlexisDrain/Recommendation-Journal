@@ -1,8 +1,9 @@
 // The list. One box does both jobs: type to search everything you've saved; if it isn't there,
 // press Enter (or tap "+ Add") to add it, already filled in with what you typed.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { CategoryPicker, CategoryTabs } from '@/components/CategoryTabs';
 import { CategoryEditor } from '@/components/CategoryEditor';
 import { ItemEditor, type ItemDraft } from '@/components/ItemEditor';
 import { ItemRow } from '@/components/ItemRow';
@@ -10,12 +11,13 @@ import { SyncChip } from '@/components/SyncChip';
 import { Toast, type ToastMessage } from '@/components/Toast';
 import { Chip, ErrorBox, Muted, styles } from '@/components/ui';
 import { reload, store, useData } from '@/db/store';
+import { syncNow, useSyncStatus } from '@/db/sync';
 import { withArticle } from '@/lib/categories';
 import { useThemeName } from '@/lib/displayMode';
 import { hasTitle, search } from '@/lib/search';
 import { colors, radius, space } from '@/lib/theme';
 import type { Item, Rating, Status } from '@/lib/types';
-import { page } from '@/lib/useLayout';
+import { page, useWide, WIDE_PAGE } from '@/lib/useLayout';
 
 type Sort = 'newest' | 'title' | 'rating';
 const SORTS: [Sort, string][] = [['newest', 'Newest'], ['title', 'A–Z'], ['rating', 'Best rated']];
@@ -42,6 +44,7 @@ export default function ListScreen() {
   const [newCategory, setNewCategory] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const input = useRef<TextInput>(null);
+  const wide = useWide();
 
   const visible = useMemo(() => categories.filter((c) => !c.hidden), [categories]);
   const byUid = useMemo(() => new Map(categories.map((c) => [c.uid, c])), [categories]);
@@ -61,6 +64,15 @@ export default function ListScreen() {
     }
     return list;
   }, [inCategory, categories, query, status, sort, asking]);
+  const perCategory = useMemo(() => {
+    const m = new Map<string, number>([['all', 0]]);
+    for (const i of items) {
+      if (hiddenUids.has(i.categoryUid)) continue;
+      m.set(i.categoryUid, (m.get(i.categoryUid) ?? 0) + 1);
+      m.set('all', m.get('all')! + 1);
+    }
+    return m;
+  }, [items, hiddenUids]);
   const counts = useMemo(() => ({
     want: inCategory.filter((i) => i.status === 'want').length,
     done: inCategory.filter((i) => i.status === 'done').length,
@@ -86,7 +98,30 @@ export default function ListScreen() {
   }, []);
   const hideToast = useCallback(() => setToast(null), []);
 
+  // Saving never waits for the Google Sheet. If a sync fails afterwards, say so once (a new
+  // problem shows again; the Sync button keeps showing it until a sync works).
+  const sync = useSyncStatus();
+  const shownError = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sync.error) {
+      shownError.current = null;
+      return;
+    }
+    if (sync.running || sync.error === shownError.current) return;
+    shownError.current = sync.error;
+    setToast({
+      text: `Saved on this device, but the Google Sheet didn't sync: ${sync.error}`,
+      action: { label: 'Retry', run: () => void syncNow().catch(() => {}) },
+    });
+  }, [sync.error, sync.running]);
+
   if (error) return <View style={[styles.screen, { padding: space.lg }]}><ErrorBox message={error} onRetry={() => void reload()} /></View>;
+
+  const pickCategory = (uid: string | 'all') => {
+    setCategoryUid(uid);
+    if (uid !== 'all') rememberCategory(uid);
+  };
+  const tabProps = { categories: visible, counts: perCategory, selected: categoryUid, onSelect: pickCategory, onNew: () => setNewCategory(true) };
 
   const statusChip = (s: Status | 'all', label: string) => (
     <Chip key={s} label={label} selected={status === s} onPress={() => setStatus(s)}
@@ -110,15 +145,7 @@ export default function ListScreen() {
         )}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ gap: space.sm }}>
-        <Chip label="All" selected={categoryUid === 'all'} onPress={() => setCategoryUid('all')} />
-        {visible.map((c) => (
-          <Chip key={c.uid} label={c.name} selected={categoryUid === c.uid}
-            onPress={() => { setCategoryUid(categoryUid === c.uid ? 'all' : c.uid); rememberCategory(c.uid); }} />
-        ))}
-        <Chip label="+ New" color={colors.warm} onPress={() => setNewCategory(true)} />
-      </ScrollView>
+      {!wide && <CategoryPicker {...tabProps} />}
 
       <View style={[styles.chips, { alignItems: 'center' }]}>
         {statusChip('all', 'All')}
@@ -148,27 +175,36 @@ export default function ListScreen() {
 
   return (
     <View style={styles.screen}>
-      <FlatList
-        data={shown}
-        keyExtractor={(i) => i.uid}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.scroll, page(760), { paddingBottom: 96 }]}
-        ListHeaderComponent={header}
-        renderItem={({ item }) => (
-          <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected}
-            asking={asking === item.uid} onPress={onPress} onDone={onDone} onRate={onRate} />
+      <View style={[{ flex: 1, flexDirection: 'row' }, wide && page(WIDE_PAGE)]}>
+        {/* Wide screens: the categories as a column of tabs beside the list. */}
+        {wide && (
+          <ScrollView style={{ width: 240, flexGrow: 0 }} contentContainerStyle={{ padding: space.lg, paddingRight: 0 }}>
+            <CategoryTabs {...tabProps} />
+          </ScrollView>
         )}
-        ListEmptyComponent={loaded ? (
-          <View style={{ padding: space.xl, gap: space.sm, alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 17, textAlign: 'center' }}>
-              {query ? 'Nothing matches yet.' : items.length ? 'Nothing here yet.' : 'Your list is empty.'}
-            </Text>
-            <Muted>
-              {query ? 'Press Enter to add it.' : 'Type a title in the box above and press Enter to add your first recommendation.'}
-            </Muted>
-          </View>
-        ) : null}
-      />
+        <FlatList
+          style={{ flex: 1 }}
+          data={shown}
+          keyExtractor={(i) => i.uid}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}
+          ListHeaderComponent={header}
+          renderItem={({ item }) => (
+            <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected}
+              asking={asking === item.uid} onPress={onPress} onDone={onDone} onRate={onRate} />
+          )}
+          ListEmptyComponent={loaded ? (
+            <View style={{ padding: space.xl, gap: space.sm, alignItems: 'center' }}>
+              <Text style={{ color: colors.text, fontSize: 17, textAlign: 'center' }}>
+                {query ? 'Nothing matches yet.' : items.length ? 'Nothing here yet.' : 'Your list is empty.'}
+              </Text>
+              <Muted>
+                {query ? 'Press Enter to add it.' : 'Type a title in the box above and press Enter to add your first recommendation.'}
+              </Muted>
+            </View>
+          ) : null}
+        />
+      </View>
 
       <ItemEditor visible={!!editing} item={editing} onClose={() => setEditing(null)}
         onDeleted={(it) => setToast({ text: `Deleted “${it.title}”.`, action: { label: 'Undo', run: () => void store.items.undoRemove(it.uid) } })} />
@@ -180,7 +216,7 @@ export default function ListScreen() {
           setToast({ text: `Added “${it.title}”.`, action: { label: 'Undo', run: () => void store.items.remove(it.uid) } });
         }} />
       <CategoryEditor visible={newCategory} onClose={() => setNewCategory(false)}
-        onSaved={(c) => { setCategoryUid(c.uid); rememberCategory(c.uid); }} />
+        onSaved={(c) => pickCategory(c.uid)} />
       <Toast message={toast} onHide={hideToast} />
     </View>
   );

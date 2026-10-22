@@ -1,37 +1,23 @@
-// "⟳ Sync" on the list: sync with the Google Sheet right now
-// instead of waiting for the automatic sync. Only shown when a sheet is connected.
+// "⟳ Sync" on the list: shows when the Google Sheet is catching up (it does by itself a few
+// seconds after each change), and syncs right away when tapped. Only shown when a sheet is connected.
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getConnection, syncNow } from '@/db/sync';
+import { useCallback, useState } from 'react';
+import { getConnection, syncNow, useSyncStatus } from '@/db/sync';
+import { colors } from '@/lib/theme';
 import { Chip } from './ui';
-
-type State = 'idle' | 'busy' | 'done' | 'failed';
-const LABEL: Record<State, string> = { idle: '⟳ Sync', busy: 'Syncing…', done: 'Synced ✓', failed: 'Sync failed' };
 
 export function SyncChip() {
   const [connected, setConnected] = useState(false);
-  const [state, setState] = useState<State>('idle');
-  const reset = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { running, error } = useSyncStatus();
 
   // Connecting or disconnecting happens in Settings, so look again whenever this tab is shown.
   useFocusEffect(useCallback(() => {
     getConnection().then((c) => setConnected(!!c), () => setConnected(false));
   }, []));
-  useEffect(() => () => { if (reset.current) clearTimeout(reset.current); }, []);
 
   if (!connected) return null;
-
-  const run = async () => {
-    if (reset.current) clearTimeout(reset.current);
-    setState('busy');
-    try {
-      await syncNow(); // the list redraws itself with what came in
-      setState('done');
-    } catch {
-      setState('failed'); // the reason is shown in Settings → Google Sheet
-    }
-    reset.current = setTimeout(() => setState('idle'), 3000);
-  };
-
-  return <Chip label={LABEL[state]} selected={state === 'busy'} onPress={state === 'busy' ? undefined : run} />;
+  const label = running ? 'Syncing…' : error ? '⚠ Sync failed' : '⟳ Sync';
+  // The reason for a failure is shown along the bottom of the list, and in Settings → Google Sheet.
+  return <Chip label={label} selected={running} color={error && !running ? colors.danger : colors.accent}
+    onPress={running ? undefined : () => void syncNow().catch(() => {})} />;
 }

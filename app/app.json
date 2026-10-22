@@ -53,6 +53,9 @@
     "owner": "alexisdrain",
     "runtimeVersion": {
       "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9373db15-14d1-4899-8703-04c649026b1f"
     }
   }
 }
