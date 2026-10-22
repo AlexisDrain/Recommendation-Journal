@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+
+# Personal data (your lists, exports, study sheets): keep them out of the repo
+*.csv
+*.xlsx
+*.db
+*.sqlite

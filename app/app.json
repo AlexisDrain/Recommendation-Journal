@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Recommendation Journal",
+    "slug": "recommendation-journal",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "scheme": "recommendationjournal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0e1120",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "backgroundColor": "#0e1120",
+      "name": "Recommendation Journal",
+      "shortName": "Recs",
+      "description": "Remember what people recommended to you, and why.",
+      "themeColor": "#0e1120"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router",
+      "@react-native-community/datetimepicker",
+      "expo-sqlite",
+      "expo-sharing",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9373db15-14d1-4899-8703-04c649026b1f"
+      }
+    },
+    "owner": "alexisdrain",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
+  }
+}

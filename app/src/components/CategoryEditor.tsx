@@ -1,0 +1,91 @@
+// Add a category, or change one: its name, its words, hide it, delete it.
+import { useState } from 'react';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { store, useData } from '@/db/store';
+import { confirmAction } from '@/lib/confirm';
+import { colors, space } from '@/lib/theme';
+import type { Category } from '@/lib/types';
+import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
+import { Panel, useOpening } from './Panel';
+import { Button, Muted, Row } from './ui';
+
+interface Props {
+  visible: boolean;
+  /** Editing this one; leave out to add a new category. */
+  category?: Category | null;
+  onClose: () => void;
+  onSaved?: (c: Category) => void;
+}
+
+export function CategoryEditor(props: Props) {
+  const opening = useOpening(props);
+  return (
+    <Panel visible={props.visible} onClose={props.onClose}>
+      {opening.key > 0 && <CategoryForm key={opening.key} {...opening.props} />}
+    </Panel>
+  );
+}
+
+function CategoryForm({ category, onClose, onSaved }: Props) {
+  const { items } = useData();
+  const [draft, setDraft] = useState<CategoryDraft>(() => category
+    ? { name: category.name, noun: category.noun, wantLabel: category.wantLabel, doneLabel: category.doneLabel }
+    : emptyCategoryDraft());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const count = category ? items.filter((i) => i.categoryUid === category.uid).length : 0;
+
+  const save = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (category) {
+        await store.categories.update(category.uid, draft);
+        onSaved?.({ ...category, ...draft });
+      } else {
+        onSaved?.(await store.categories.create(draft));
+      }
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!category) return;
+    const ok = await confirmAction(
+      `Delete “${category.name}”?`,
+      count ? `Its ${count} recommendation${count === 1 ? '' : 's'} will be deleted too. To keep them, hide the category instead.` : undefined,
+      'Delete',
+    );
+    if (!ok) return;
+    await store.categories.remove(category.uid);
+    onClose();
+  };
+
+  return (
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.md }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{category ? 'Edit category' : 'New category'}</Text>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+          <Text style={{ color: colors.muted, fontSize: 22 }}>×</Text>
+        </Pressable>
+      </View>
+      <CategoryFields key={category?.uid ?? 'new'} value={draft} onChange={setDraft} autoFocus={!category} ideas={!category} onSubmit={save} />
+      {category && (
+        <Row label="Hide this category">
+          <Switch value={category.hidden} trackColor={{ true: colors.accent }}
+            onValueChange={(hidden) => void store.categories.update(category.uid, { hidden }).then(onClose)} />
+        </Row>
+      )}
+      {category && <Muted>Hidden categories are left off the list and the add screen. Their recommendations are kept.</Muted>}
+      {error && <Text style={{ color: colors.danger }}>{error}</Text>}
+      <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
+      {category && <Button title="Delete category" onPress={remove} small color={colors.chip} textColor={colors.danger} />}
+    </ScrollView>
+  );
+}

@@ -1,0 +1,72 @@
+// The starter categories, and the guesses that fill in a new category's words for you.
+import type { Category } from './types';
+
+type Words = Pick<Category, 'noun' | 'wantLabel' | 'doneLabel'>;
+
+/**
+ * The starter categories. Their uids are fixed, so a new phone and a new browser pair up with the
+ * same categories in the Google Sheet instead of making a second "Movie" tab.
+ */
+export const DEFAULT_CATEGORIES: (Words & { uid: string; name: string })[] = [
+  { uid: 'default-nonfiction', name: 'Non-fiction book', noun: 'book', wantLabel: 'Want to read', doneLabel: 'Read' },
+  { uid: 'default-fiction', name: 'Fiction book', noun: 'book', wantLabel: 'Want to read', doneLabel: 'Read' },
+  { uid: 'default-videogame', name: 'Video game', noun: 'game', wantLabel: 'Want to play', doneLabel: 'Played' },
+  { uid: 'default-tvshow', name: 'TV show', noun: 'show', wantLabel: 'Want to watch', doneLabel: 'Watched' },
+  { uid: 'default-movie', name: 'Movie', noun: 'movie', wantLabel: 'Want to watch', doneLabel: 'Watched' },
+  { uid: 'default-album', name: 'Music album', noun: 'album', wantLabel: 'Want to listen', doneLabel: 'Listened' },
+  { uid: 'default-recipe', name: 'Cooking recipe', noun: 'recipe', wantLabel: 'Want to cook', doneLabel: 'Cooked' },
+  { uid: 'default-other', name: 'Other', noun: 'media', wantLabel: 'Want to experience', doneLabel: 'Experienced' },
+];
+
+// [words in the name, the verb, its past tense]. The first match wins.
+const VERBS: [RegExp, string, string][] = [
+  [/game|play|quest|puzzle|board|rpg|d&d/i, 'play', 'Played'],
+  [/movie|film|show|tv|series|anime|cartoon|video|youtube|documentary|youtuber|stream|episode|critical role/i, 'watch', 'Watched'],
+  [/album|music|song|band|artist|podcast|audio|playlist|singer|radio/i, 'listen', 'Listened'],
+  [/book|novel|poem|poetry|story|stories|paper|article|essay|comic|manga|blog|fic|magazine|read/i, 'read', 'Read'],
+  [/recipe|dish|cook|bake|meal/i, 'cook', 'Cooked'],
+  [/restaurant|food|drink|wine|beer|coffee|snack|cafe|café|bar\b/i, 'try', 'Tried'],
+  [/place|city|country|trip|travel|museum|park|hike|visit/i, 'visit', 'Visited'],
+  [/app|tool|software|website|site|product|gadget/i, 'try', 'Tried'],
+  [/course|class|lecture|talk|skill/i, 'take', 'Took'],
+];
+
+/**
+ * Suggests the words for a category from its name:
+ *   "Flash game" → game / Want to play / Played
+ *   "Poem"       → poem / Want to read / Read
+ *   "Thing"      → thing / Want to experience / Experienced
+ */
+export function suggestWords(name: string): Words {
+  const clean = name.trim();
+  const last = singular(clean.split(/\s+/).pop()?.toLowerCase() ?? '');
+  const noun = !last || last === 'other' || last === 'misc' ? 'media' : last;
+  const verb = VERBS.find(([re]) => re.test(clean));
+  return verb
+    ? { noun, wantLabel: `Want to ${verb[1]}`, doneLabel: verb[2] }
+    : { noun, wantLabel: 'Want to experience', doneLabel: 'Experienced' };
+}
+
+/** "Movies" → "movie", "Stories" → "story"; leaves "series", "glass", "anime" alone. */
+function singular(w: string): string {
+  if (/(series|news|ss|us)$/.test(w) || w.length < 4) return w;
+  if (/[^aeiou][^aeiou]ies$|[dlrt]ories$|[bp]ies$/.test(w) && !/(movies|cookies|zombies|selfies|pies)$/.test(w)) return w.slice(0, -3) + 'y';
+  return w.endsWith('s') ? w.slice(0, -1) : w;
+}
+
+/** Example names shown when making a new category, to give the idea. */
+export const CATEGORY_IDEAS = ['Podcast', 'Anime', 'Board game', 'Poem', 'Restaurant', 'YouTube channel', 'Flash game'];
+
+/** "a movie" / "an album" */
+export const withArticle = (noun: string) => `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun}`;
+
+/** Only letters and numbers, lowercase, accents removed: for comparing names and searching. */
+export function normalize(s: string): string {
+  return s
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
