@@ -16,7 +16,7 @@
   --text: #e8eaf6;
   --muted: #8a90b2;
   --accent: #9fa8ff;  /* buttons, selected */
-  --warm: #ffc47a;    /* on your list, Up next */
+  --warm: #ffc47a;    /* on your list, Priority */
   --green: #7be0a8;   /* done */
   --sky: #070912;     /* around the stage */
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
@@ -238,7 +238,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="field tall" id="a-why"></div>
               <div class="chips"><span class="chipx w sel">Want to play</span><span class="chipx g">Played</span></div>
               <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
-              <div class="chips"><span class="chipx w">☆ Up next</span></div>
+              <div class="chips"><span class="chipx w">☆ Make it a priority</span></div>
               <div class="btn" id="a-save">Add</div>
             </div>
             <div class="tap" id="a-tap"></div>
@@ -274,10 +274,10 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
         </div>
       </section>
 
-      <!-- 3. Up next -->
-      <section class="scene" id="s-upnext" aria-label="Up next">
+      <!-- 3. Priority -->
+      <section class="scene" id="s-upnext" aria-label="Priority">
         <div class="caption">
-          <div class="eyebrow" style="color: var(--warm)">Up next</div>
+          <div class="eyebrow" style="color: var(--warm)">Priority</div>
           <h2>Pick what's next.</h2>
           <p>Star what you want to get to soon, and drag it into order.</p>
           <p><q id="u-quote">Watch Titanic this weekend.</q></p>
@@ -288,7 +288,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
             <div class="app">
               <div class="apptitle">Recommendations</div>
               <div class="search"><span>⌕</span><span class="ph">Search, or type something new to add…</span></div>
-              <div class="pick"><span>Category</span><b style="color: var(--warm)">★ Up next</b><span>3</span><span>▾</span></div>
+              <div class="pick"><span>Category</span><b style="color: var(--warm)">★ Priority</b><span>3</span><span>▾</span></div>
               <div class="muted">What you want to get to soon. Drag ≡ to change the order; done things leave the list.</div>
               <div class="queue" id="u-queue">
                 <div class="irow" data-key="kane"><div class="t"><i class="rank"></i>Citizen Kane</div><div class="m">by Orson Welles · Movie · from my film teacher</div><span class="grip">≡</span></div>
@@ -308,7 +308,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
           <div class="eyebrow" style="color: var(--green)">Done</div>
           <h2>Watched it? Rate it.</h2>
           <p>❌ bad, ✅ average, 👍 great, ❤️ exceptional.</p>
-          <p>It leaves Up next by itself.</p>
+          <p>It stops being a priority by itself.</p>
         </div>
         <div class="phone" style="left: 760px; top: 40px">
           <div class="screen">
@@ -334,7 +334,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               </div>
               <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
               <div class="prow" id="d-on" style="visibility: hidden">Watched on <b>Oct 25, 2026</b></div>
-              <div class="chips"><span class="chipx w" id="d-up">★ Up next #1</span></div>
+              <div class="chips"><span class="chipx w" id="d-up">★ Priority #1</span></div>
               <div class="btn" id="d-save">Save</div>
             </div>
             <div class="tap" id="d-tap"></div>
@@ -381,7 +381,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
           <div class="web">
             <div class="rail"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
             <div class="cats">
-              <div class="up">★ Up next <span>2</span></div><div>All <span id="y-all">8</span></div><div>Movie <span>3</span></div><div>Fiction book <span>2</span></div><div class="cur">Flash game <span id="y-fg">2</span></div>
+              <div class="up">★ Priority <span>2</span></div><div>All <span id="y-all">8</span></div><div>Movie <span>3</span></div><div>Fiction book <span>2</span></div><div class="cur">Flash game <span id="y-fg">2</span></div>
             </div>
             <div class="pane">
               <div class="search" style="height: 32px; font-size: 11.5px; margin-bottom: 6px"><span>⌕</span><span id="y-web-q"></span></div>
@@ -529,7 +529,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
     for (const row of document.querySelectorAll('#s-search .irow')) row.classList.toggle('gone', query.length >= 2 && row.dataset.match === '0');
     tapAt($('q-tap'), q, [[1.0, $('q-q')], [5.6, $('q-x')]]);
 
-    // ---- 3. Up next: drag Titanic from third to first, then give it a note.
+    // ---- 3. Priority: drag Titanic from third to first, then give it a note.
     const u = t - 19.5;
     const SLOT = 92;
     const dragFrom = 1.6, dragTo = 3.1;
@@ -563,7 +563,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
       tapAt(uTap, u, [[4.3, $('u-note').closest('.irow')]]);
     }
 
-    // ---- 4. Done: open it, tap Watched, ❤️, Save. It turns green and leaves Up next.
+    // ---- 4. Done: open it, tap Watched, ❤️, Save. It turns green and stops being a priority.
     const d = t - 28.5;
     const editing = d >= 0.6 && d < 4.4;
     const watched = d >= 1.6, loved = d >= 2.5, saved = d >= 4.4;

@@ -20,7 +20,7 @@ const CONNECTION_KEY = 'recjournal.sheetConnection';
 const STATE_KEY = 'recjournal.sheetSync.v1';
 const PUSH_BATCH = 300;
 /** The version of google-sheets/RecommendationJournalSync.gs this app was built for (its SCRIPT_VERSION). */
-export const LATEST_SCRIPT_VERSION = 5;
+export const LATEST_SCRIPT_VERSION = 6;
 
 export interface Connection { url: string; secret: string }
 
@@ -140,6 +140,14 @@ export async function disconnect() {
 
 /** A category as the sheet's "Categories" tab keeps it. */
 interface SheetCategory { id: string; name: string; noun: string; want: string; done: string; order: number; hidden: boolean; deleted: boolean; updated: string }
+/**
+ * A row's cells as sent to the sheet. "Priority" was called "Up next" before script version 6: a
+ * script that old ignores "Priority" (and a newer one ignores "Up next"), so both are sent.
+ */
+function withOldNames(cells: ReturnType<typeof itemCells>, order: string): Record<string, string> {
+  return { ...cells, 'Up next': cells.Priority, [ORDER_COLUMN]: order };
+}
+
 interface SheetItem { id: string; category: string; updated: string; cells: Record<string, string> }
 interface SyncAnswer {
   categories: SheetCategory[];
@@ -232,7 +240,7 @@ async function runSync() {
     const changed = (await allItems()).filter((i) => i.updatedAt > state.lastPushed);
     const sent = changed.map((i) => ({
       id: i.uid, category: i.categoryUid, deleted: i.deleted, updated: i.updatedAt,
-      values: i.deleted ? {} : { ...itemCells(i, byUid.get(i.categoryUid)), [ORDER_COLUMN]: String(i.manualPos) },
+      values: i.deleted ? {} : withOldNames(itemCells(i, byUid.get(i.categoryUid)), String(i.manualPos)),
     }));
 
     // Big first syncs go in batches; the last request also brings back the sheet's changes.

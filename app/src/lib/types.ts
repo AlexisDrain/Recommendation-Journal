@@ -45,7 +45,7 @@ export interface Item {
   recommendedOn: string | null;
   /** When you watched / read / played it. */
   doneOn: string | null;
-  /** Its place on "Up next" (1 = first), or null when it isn't on it. */
+  /** Its place in "Priority" (1 = first), or null when it isn't on it. */
   queuePos: number | null;
   /** Its place in "My order": higher comes first. */
   manualPos: number;

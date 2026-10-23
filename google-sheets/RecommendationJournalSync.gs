@@ -32,7 +32,7 @@
  * Bump this whenever the script changes in a way the app should know about. The app compares it
  * with the version it was built for and tells the user when their sheet's script is out of date.
  */
-const SCRIPT_VERSION = 5;
+const SCRIPT_VERSION = 6;
 
 const CATEGORIES_TAB = 'Categories';
 const DELETED_TAB = 'Deleted';
@@ -43,7 +43,7 @@ const CHANGED = 'Changed';
 // "List order": your own order in the app ("My order"; higher comes first). Hidden, like Changed.
 const ORDER = 'List order';
 const CAT_COLS = ['Id', 'Name', 'One is called', 'On your list', 'Done', 'Order', 'Hidden', 'Deleted', UPDATED];
-const ITEM_COLS = ['Title', 'Author', 'Status', 'Up next', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on', 'Id', UPDATED, CHANGED, ORDER];
+const ITEM_COLS = ['Title', 'Author', 'Status', 'Priority', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on', 'Id', UPDATED, CHANGED, ORDER];
 const ITEM_WIDTHS = [260, 180, 130, 70, 130, 160, 320, 120, 120, 130, 160, 160, 90];
 const RATINGS = ['❌ Bad', '✅ Average', '👍 Great', '❤️ Exceptional'];
 const HEADER_COLOR = '#c9cdf5';
@@ -319,7 +319,7 @@ function ensureTabs_(ctx, cats) {
     setProp_(ctx, 'TAB_' + c.id, t.id);
     setProp_(ctx, 'TABNAME_' + c.id, t.name);
     // Columns, drop-downs and hiding: only when the category's words or "hidden" changed.
-    const layout = JSON.stringify([5, c.want, c.done, c.hidden]);
+    const layout = JSON.stringify([6, c.want, c.done, c.hidden]);
     if (prop_(ctx, 'LAYOUT_' + t.id) !== layout) {
       ensureItemColumns_(t.sh);
       applyChoices_(t.sh, c);
@@ -624,6 +624,12 @@ function newItemTab_(ctx, name) {
 /** Adds any missing columns at the end (your own columns stay where they are), as plain text. */
 function ensureItemColumns_(sh) {
   const headers = sh.getLastColumn() ? headers_(sh) : [];
+  // "Priority" was called "Up next" before version 6: rename that column where it is.
+  const old = headers.indexOf('Up next');
+  if (old >= 0 && headers.indexOf('Priority') < 0) {
+    sh.getRange(1, old + 1).setValue('Priority');
+    headers[old] = 'Priority';
+  }
   ITEM_COLS.forEach(function (h, i) {
     if (headers.indexOf(h) >= 0) return;
     const at = headers.length + 1;

@@ -107,7 +107,7 @@ export default function ListScreen() {
     title: query.trim(),
     categoryUid: addTo?.uid,
     status: status === 'done' && !upNextMode ? 'done' : 'want',
-    upNext: upNextMode, // added while looking at Up next: it goes on Up next
+    upNext: upNextMode, // added while looking at Priority: it becomes a priority
   });
 
   const onPress = useCallback((item: Item) => setEditing(item), []);
@@ -177,7 +177,7 @@ export default function ListScreen() {
             <Muted>
               {queue.length
                 ? 'What you want to get to soon. Drag ≡ to change the order; done things leave the list.'
-                : 'Nothing here yet. Open something on your list and tap “★ Up next” to put it here.'}
+                : 'Nothing here yet. Open something on your list and tap “☆ Make it a priority” to put it here.'}
             </Muted>
           </View>
           <SyncChip />
@@ -224,13 +224,13 @@ export default function ListScreen() {
           </ScrollView>
         )}
         {(upNextMode || (sort === 'manual' && rearranging)) && !query ? (
-          // Up next, and "My order" while rearranging: drag ≡ to put in order. Not a FlatList (the rows
+          // Priority, and "My order" while rearranging: drag ≡ to put in order. Not a FlatList (the rows
           // move while you drag), so every row is drawn: fine for these, too slow as the everyday view
           // of a long list.
           <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled"
             contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}>
             {header}
-            <SortableList data={upNextMode ? queue : shown} keyOf={(i) => i.uid} label="recommendation"
+            <SortableList data={upNextMode ? queue : shown} keyOf={(i) => i.uid} label="recommendation" wholeRow={!upNextMode}
               onReorder={(next) => (upNextMode ? store.upNext.reorder : store.items.reorder)(next.map((i) => i.uid))
                 .catch((e) => setToast({ text: (e as Error).message }))}
               renderRow={(item) => (

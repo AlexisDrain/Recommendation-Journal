@@ -7,12 +7,12 @@ import type { Category } from '@/lib/types';
 
 interface Props {
   categories: Category[];
-  /** Items per category uid, 'all' for the total and 'upnext' for Up next. */
+  /** Items per category uid, 'all' for the total and 'upnext' for Priority. */
   counts: Map<string, number>;
   selected: string | 'all';
   onSelect: (uid: string | 'all') => void;
   onNew: () => void;
-  /** Leave out "Up next" and "+ New category" (the Sheet tab: All and the categories). */
+  /** Leave out "Priority" and "+ New category" (the Sheet tab: All and the categories). */
   plain?: boolean;
 }
 
@@ -38,7 +38,7 @@ function Tab({ label, count, selected, onPress, color = colors.text }: {
 export function CategoryTabs({ categories, counts, selected, onSelect, onNew, plain }: Props) {
   return (
     <View accessibilityRole="tablist" style={{ gap: 2 }}>
-      {!plain && <Tab label="★ Up next" count={counts.get('upnext') ?? 0} selected={selected === 'upnext'} onPress={() => onSelect('upnext')} color={colors.warm} />}
+      {!plain && <Tab label="★ Priority" count={counts.get('upnext') ?? 0} selected={selected === 'upnext'} onPress={() => onSelect('upnext')} color={colors.warm} />}
       <Tab label="All" count={counts.get('all') ?? 0} selected={selected === 'all'} onPress={() => onSelect('all')} />
       {categories.map((c) => (
         <Tab key={c.uid} label={c.name} count={counts.get(c.uid) ?? 0} selected={selected === c.uid} onPress={() => onSelect(c.uid)} />
@@ -61,7 +61,7 @@ export function CategoryPicker(props: Props) {
         }}>
         <Text style={{ color: colors.muted, fontSize: 15 }}>Category</Text>
         <Text style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
-          {current?.name ?? (props.selected === 'upnext' ? '★ Up next' : 'All')}
+          {current?.name ?? (props.selected === 'upnext' ? '★ Priority' : 'All')}
         </Text>
         <Text style={{ color: colors.muted, fontSize: 13 }}>{props.counts.get(current?.uid ?? props.selected) ?? 0}</Text>
         <Text style={{ color: colors.muted, fontSize: 14 }}>{open ? '▴' : '▾'}</Text>

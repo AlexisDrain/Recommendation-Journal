@@ -190,7 +190,7 @@ function cleanPatch(patch: ItemPatch, before?: Item): ItemPatch {
   if (p.rating && p.status === undefined && before?.status === 'want') p.status = 'done'; // rating it = you've had it
   if (p.status === 'done' && before?.status !== 'done' && p.doneOn === undefined && !before?.doneOn) p.doneOn = today();
   if (p.status === 'want' && before?.status === 'done' && p.doneOn === undefined) p.doneOn = null;
-  if (p.status === 'done' && p.queuePos === undefined && before?.queuePos != null) p.queuePos = null; // done: off Up next
+  if (p.status === 'done' && p.queuePos === undefined && before?.queuePos != null) p.queuePos = null; // done: no longer a priority
   return p;
 }
 
@@ -254,24 +254,24 @@ async function reorderManually(uids: string[]) {
   await changed();
 }
 
-/** "Up next": the things you mean to get to soon, in your own order. */
+/** "Priority" (called upNext in the code): the things you mean to get to first, in your own order. */
 const upNext = {
-  /** On Up next, in order. */
+  /** The priorities, in order. */
   list: (all = data.items) => all.filter((i) => i.queuePos != null).sort((a, b) => a.queuePos! - b.queuePos!),
 
-  /** Puts an item at the end of Up next. */
+  /** Makes an item the last priority. */
   add: async (uid: string) => {
     const last = upNext.list().reduce((m, i) => Math.max(m, i.queuePos!), 0);
     await items.update(uid, { queuePos: last + 1 });
   },
 
-  /** Takes an item off Up next, and closes the gap it leaves. */
+  /** Takes an item off Priority, and closes the gap it leaves. */
   remove: async (uid: string) => {
     await upNext.reorder(upNext.list().map((i) => i.uid).filter((u) => u !== uid), uid);
   },
 
   /**
-   * Numbers Up next 1, 2, 3… in the given order. Only items whose place changed are stamped, so
+   * Numbers the priorities 1, 2, 3… in the given order. Only items whose place changed are stamped, so
    * only they are sent to the sheet. `drop`: also take this item off.
    */
   reorder: async (uids: string[], drop?: string) => {
