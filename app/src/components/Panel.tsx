@@ -2,7 +2,7 @@
 //   Phones: slides up from the bottom (a "bottom sheet").
 //   Wide screens: a dialog in the middle of the screen.
 // Either way the dimmed background covers the whole screen, and tapping it closes the panel.
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { colors, radius, space } from '@/lib/theme';
 import { useWide } from '@/lib/useLayout';
@@ -48,4 +48,24 @@ export function useOpening<P extends { visible: boolean }>(props: P): { key: num
     setState({ visible: props.visible, key: state.key + (props.visible ? 1 : 0), props: props.visible ? props : state.props });
   }
   return { key: state.key, props: props.visible ? props : state.props };
+}
+
+/**
+ * Closing a panel saves (×, tapping outside, Escape): the form inside registers what closing
+ * should do with `useCloseHandler`, and the panel's own close goes through `requestClose`.
+ * With nothing registered, the panel just closes.
+ */
+export function useCloseRequest(onClose: () => void) {
+  const handler = useRef<(() => void) | null>(null);
+  const register = useCallback((fn: (() => void) | null) => { handler.current = fn; }, []);
+  const requestClose = useCallback(() => (handler.current ?? onClose)(), [onClose]);
+  return { register, requestClose };
+}
+
+/** For the form inside a panel: what closing it does (see useCloseRequest). */
+export function useCloseHandler(register: ((fn: (() => void) | null) => void) | undefined, onCloseRequest: () => void) {
+  useEffect(() => {
+    register?.(onCloseRequest);
+    return () => register?.(null);
+  });
 }

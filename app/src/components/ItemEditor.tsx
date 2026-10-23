@@ -6,14 +6,19 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { categoryNamed, store, useData } from '@/db/store';
 import { withArticle } from '@/lib/categories';
 import { today } from '@/lib/dates';
+import { dropDraft, getDraft, keepDraft } from '@/lib/drafts';
 import { RATINGS } from '@/lib/rating';
 import { hasTitle, people } from '@/lib/search';
 import { colors, space } from '@/lib/theme';
 import type { Item, Rating, Status } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
 import { DateField } from './DateField';
-import { Panel, useOpening } from './Panel';
+import { Panel, useCloseHandler, useCloseRequest, useOpening } from './Panel';
 import { Button, Chip, Input, Muted, styles } from './ui';
+
+/** Above this many categories the panel shows only the most-used ones, with a "+ N more" chip. */
+const FEW_CATEGORIES = 8;
+const MOST_USED = 6;
 
 export interface ItemDraft {
   title: string;
@@ -42,24 +47,49 @@ interface Props {
 
 export function ItemEditor(props: Props) {
   const opening = useOpening(props);
+  const { register, requestClose } = useCloseRequest(props.onClose);
   return (
-    <Panel visible={props.visible} onClose={props.onClose} maxWidth={600}>
-      {opening.key > 0 && <ItemForm key={opening.key} {...opening.props} />}
+    <Panel visible={props.visible} onClose={requestClose} maxWidth={600}>
+      {opening.key > 0 && <ItemForm key={opening.key} {...opening.props} registerClose={register} />}
     </Panel>
   );
 }
 
-function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
+function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: Props & {
+  registerClose?: (fn: (() => void) | null) => void;
+}) {
   const { categories, items } = useData();
   const shown = categories.filter((c) => !c.hidden || c.uid === item?.categoryUid);
-  const [draft, setDraft] = useState<ItemDraft>(() => item ? { ...item, upNext: item.queuePos != null } : {
+  // What the panel shows without a draft: the saved item, or a new one with its defaults.
+  const [base] = useState<ItemDraft>(() => item ? { ...item, upNext: item.queuePos != null } : {
     title: '', author: '', categoryUid: shown[0]?.uid ?? '', status: 'want', rating: null, recommendedBy: '', note: '',
     recommendedOn: today(), doneOn: null, ...start,
   });
-  const [newCategory, setNewCategory] = useState<CategoryDraft | null>(null);
+  // A draft left here before (closed without saving). For a new one, only if it's the same title
+  // you're adding now (or you didn't type one): adding something else starts fresh.
+  const draftKey = item?.uid ?? 'new';
+  const [restored] = useState(() => {
+    const d = getDraft(draftKey);
+    return d && (item || !start?.title || d.fields.title === start.title) ? d : null;
+  });
+  const [draft, setDraft] = useState<ItemDraft>(() => (restored ? { ...base, ...(restored.fields as Partial<ItemDraft>) } : base));
+  const [newCategory, setNewCategory] = useState<CategoryDraft | null>(() => (restored?.newCategory as CategoryDraft | null) ?? null);
+  const [showRestored, setShowRestored] = useState(!!restored);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const everyone = useMemo(() => people(items), [items]);
+  // Many categories would fill the panel with chips: past FEW_CATEGORIES, show the chosen one and
+  // the most-used ones (in their usual order), and a "+ N more" chip for the rest.
+  const [allCategories, setAllCategories] = useState(false);
+  const fewCategories = useMemo(() => {
+    if (shown.length <= FEW_CATEGORIES) return shown;
+    const used = new Map<string, number>();
+    for (const i of items) used.set(i.categoryUid, (used.get(i.categoryUid) ?? 0) + 1);
+    const top = new Set([...shown].sort((a, b) => (used.get(b.uid) ?? 0) - (used.get(a.uid) ?? 0)).slice(0, MOST_USED).map((c) => c.uid));
+    top.add(draft.categoryUid);
+    return shown.filter((c) => top.has(c.uid));
+  }, [shown, items, draft.categoryUid]);
+  const chips = allCategories ? shown : fewCategories;
 
   const set = (patch: Partial<ItemDraft>) => setDraft({ ...draft, ...patch });
   const category = newCategory ? { noun: newCategory.noun || 'media', wantLabel: newCategory.wantLabel, doneLabel: newCategory.doneLabel }
@@ -92,6 +122,7 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
         if (wanted) await store.upNext.add(created.uid);
         onSaved?.(created, true);
       }
+      dropDraft(draftKey);
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -100,9 +131,28 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
     }
   };
 
+  // Closing without saving (×, tapping outside, Escape) keeps what you changed as a draft on this
+  // device; nothing is saved until you press Save / Add. Opening it again brings the draft back.
+  const changed = JSON.stringify(draft) !== JSON.stringify(base) || newCategory !== null;
+  const close = () => {
+    if (changed) keepDraft(draftKey, draft as unknown as Record<string, unknown>, newCategory as unknown as Record<string, unknown> | null);
+    else dropDraft(draftKey);
+    onClose();
+  };
+  useCloseHandler(registerClose, close);
+  /** Throw the draft away: back to the saved version (or an empty new one). */
+  const discard = () => {
+    dropDraft(draftKey);
+    setDraft(base);
+    setNewCategory(null);
+    setShowRestored(false);
+    setError(null);
+  };
+
   const remove = async () => {
     if (!item) return; // no "are you sure?": the list offers Undo instead
     await store.items.remove(item.uid);
+    dropDraft(draftKey);
     onDeleted?.(item);
     onClose();
   };
@@ -113,16 +163,19 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', flex: 1 }}>
           {item ? 'Edit' : `Add ${withArticle(category?.noun || 'recommendation')}`}
         </Text>
-        {/* Up next: a pin on the thing itself, apart from its status. Done things aren't on it. */}
-        {draft.status === 'want' && (
-          <Chip label={draft.upNext ? `★ Up next${item?.queuePos ? ` #${item.queuePos}` : ''}` : '☆ Up next'} selected={!!draft.upNext}
-            color={colors.warm} onPress={() => set({ upNext: !draft.upNext })} />
-        )}
-        <Pressable onPress={onClose} style={{ marginLeft: space.md }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable onPress={close} style={{ marginLeft: space.md }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
           <Text style={{ color: colors.muted, fontSize: 22 }}>×</Text>
         </Pressable>
       </View>
 
+      {showRestored && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm }}>
+          <Text style={{ color: colors.warm, flexShrink: 1 }}>✎ Unsaved changes from before, kept on this device. {item ? 'Save' : 'Add'} them, or</Text>
+          <Pressable onPress={discard} accessibilityRole="button" hitSlop={8}>
+            <Text style={{ color: colors.warm, textDecorationLine: 'underline', fontWeight: '600' }}>discard them</Text>
+          </Pressable>
+        </View>
+      )}
       <Input placeholder="Title" value={draft.title} onChangeText={(title) => set({ title })}
         autoFocus={!item && !draft.title} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Title" />
       {duplicate && <Text style={{ color: colors.warm }}>Already on your list in this category.</Text>}
@@ -130,10 +183,14 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
         onChangeText={(author) => set({ author })} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
 
       <View style={styles.chips}>
-        {shown.map((c) => (
+        {chips.map((c) => (
           <Chip key={c.uid} label={c.name} selected={!newCategory && draft.categoryUid === c.uid}
             onPress={() => { setNewCategory(null); set({ categoryUid: c.uid }); }} />
         ))}
+        {shown.length > fewCategories.length && (
+          <Chip label={allCategories ? 'Fewer' : `+ ${shown.length - fewCategories.length} more`}
+            onPress={() => setAllCategories(!allCategories)} />
+        )}
         <Chip label="+ New category" selected={!!newCategory} color={colors.warm}
           onPress={() => setNewCategory(newCategory ? null : emptyCategoryDraft())} />
       </View>
@@ -177,12 +234,28 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
         <DateField label={`${category?.doneLabel || 'Done'} on`} value={draft.doneOn} onChange={(doneOn) => set({ doneOn })} />
       )}
 
+      {/* Up next: a pin on the thing itself, apart from its status. Done things aren't on it. */}
+      {draft.status === 'want' && (
+        <View style={styles.chips}>
+          <Chip label={draft.upNext ? `★ Up next${item?.queuePos ? ` #${item.queuePos}` : ''}` : '☆ Up next'} selected={!!draft.upNext}
+            color={colors.warm} onPress={() => set({ upNext: !draft.upNext })} />
+        </View>
+      )}
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
       <Button title={item ? 'Save' : 'Add'} onPress={save} busy={busy} disabled={!draft.title.trim()} />
       {item && (
         <Button title="Delete" onPress={remove} small color={colors.chip} textColor={colors.danger} />
       )}
-      {!item && <Muted>Only the title is needed. Press Enter to add it.</Muted>}
+      <Muted>
+        {item
+          ? 'Nothing changes until you press Save. If you close this first, your changes wait here as a draft.'
+          : 'Only the title is needed. Press Enter to add it. If you close this first, it waits here as a draft.'}
+      </Muted>
+      {changed && !showRestored && (
+        <Pressable onPress={() => { discard(); onClose(); }} accessibilityRole="button" hitSlop={8}>
+          <Text style={{ color: colors.muted, textDecorationLine: 'underline' }}>Discard changes and close</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }

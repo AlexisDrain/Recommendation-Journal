@@ -15,6 +15,7 @@ import { reload, store, useData } from '@/db/store';
 import { syncNow, useSyncStatus } from '@/db/sync';
 import { withArticle } from '@/lib/categories';
 import { useThemeName } from '@/lib/displayMode';
+import { useDrafts } from '@/lib/drafts';
 import { hasTitle, search } from '@/lib/search';
 import { colors, radius, space } from '@/lib/theme';
 import type { Item, Status } from '@/lib/types';
@@ -44,6 +45,7 @@ function rememberCategory(uid: string) {
 export default function ListScreen() {
   useThemeName(); // redraw when the display changes (dark / light)
   const { categories, items, loaded, error } = useData();
+  const drafts = useDrafts();
   const [query, setQuery] = useState('');
   /** A category's uid, 'all', or 'upnext'. */
   const [categoryUid, setCategoryUid] = useState<string>('all');
@@ -158,6 +160,15 @@ export default function ListScreen() {
         )}
       </View>
 
+      {drafts.new && (
+        // An unfinished new recommendation: closed before it was added.
+        <Pressable onPress={() => setAdding({ title: String(drafts.new.fields.title ?? '') })} accessibilityRole="button"
+          style={({ pressed }) => ({ borderWidth: 1, borderColor: colors.warm, borderRadius: radius, padding: space.md, opacity: pressed ? 0.8 : 1 })}>
+          <Text style={{ color: colors.warm }} numberOfLines={1}>
+            ✎ Continue adding {drafts.new.fields.title ? `“${String(drafts.new.fields.title)}”` : 'your unsaved recommendation'}
+          </Text>
+        </Pressable>
+      )}
       {!wide && <CategoryPicker {...tabProps} />}
 
       {upNextMode ? (
@@ -223,7 +234,7 @@ export default function ListScreen() {
               onReorder={(next) => (upNextMode ? store.upNext.reorder : store.items.reorder)(next.map((i) => i.uid))
                 .catch((e) => setToast({ text: (e as Error).message }))}
               renderRow={(item) => (
-                <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected} onPress={onPress} flush />
+                <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected} onPress={onPress} flush hasDraft={!!drafts[item.uid]} />
               )} />
             {!upNextMode && shown.length === 0 && loaded && (
               <View style={{ padding: space.xl, alignItems: 'center' }}>
@@ -235,13 +246,14 @@ export default function ListScreen() {
         <FlatList
           style={{ flex: 1 }}
           data={shown}
+          extraData={drafts}
           keyExtractor={(i) => i.uid}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}
           ListHeaderComponent={header}
           renderItem={({ item }) => (
             <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected}
-              onPress={onPress} />
+              onPress={onPress} hasDraft={!!drafts[item.uid]} />
           )}
           ListEmptyComponent={loaded ? (
             <View style={{ padding: space.xl, gap: space.sm, alignItems: 'center' }}>

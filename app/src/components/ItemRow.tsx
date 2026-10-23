@@ -6,13 +6,15 @@ import { RATINGS, ratingEmoji } from '@/lib/rating';
 import { colors, radius, space } from '@/lib/theme';
 import type { Category, Item } from '@/lib/types';
 
-export const ItemRow = memo(function ItemRow({ item, category, showCategory, onPress, flush }: {
+export const ItemRow = memo(function ItemRow({ item, category, showCategory, onPress, flush, hasDraft }: {
   item: Item;
   category?: Category;
   showCategory: boolean;
   onPress: (item: Item) => void;
   /** No space below (in a list that spaces its rows itself). */
   flush?: boolean;
+  /** Has unsaved changes waiting (a draft on this device). */
+  hasDraft?: boolean;
 }) {
   const done = item.status === 'done';
   const meta = [
@@ -36,6 +38,7 @@ export const ItemRow = memo(function ItemRow({ item, category, showCategory, onP
             {item.title}
           </Text>
           <Text style={{ color: colors.muted, fontSize: 13 }}>{meta}</Text>
+          {hasDraft && <Text style={{ color: colors.warm, fontSize: 13 }}>✎ Unsaved changes: open it to save or discard them</Text>}
           {item.note !== '' && (
             <Text style={{ color: colors.text, opacity: 0.8, fontSize: 14, fontStyle: 'italic' }} numberOfLines={2}>
               {item.note}

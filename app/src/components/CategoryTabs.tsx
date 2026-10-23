@@ -12,7 +12,7 @@ interface Props {
   selected: string | 'all';
   onSelect: (uid: string | 'all') => void;
   onNew: () => void;
-  /** Leave out "Up next", "All" and "+ New category" (the Sheet tab: just the categories). */
+  /** Leave out "Up next" and "+ New category" (the Sheet tab: All and the categories). */
   plain?: boolean;
 }
 
@@ -39,7 +39,7 @@ export function CategoryTabs({ categories, counts, selected, onSelect, onNew, pl
   return (
     <View accessibilityRole="tablist" style={{ gap: 2 }}>
       {!plain && <Tab label="★ Up next" count={counts.get('upnext') ?? 0} selected={selected === 'upnext'} onPress={() => onSelect('upnext')} color={colors.warm} />}
-      {!plain && <Tab label="All" count={counts.get('all') ?? 0} selected={selected === 'all'} onPress={() => onSelect('all')} />}
+      <Tab label="All" count={counts.get('all') ?? 0} selected={selected === 'all'} onPress={() => onSelect('all')} />
       {categories.map((c) => (
         <Tab key={c.uid} label={c.name} count={counts.get(c.uid) ?? 0} selected={selected === c.uid} onPress={() => onSelect(c.uid)} />
       ))}

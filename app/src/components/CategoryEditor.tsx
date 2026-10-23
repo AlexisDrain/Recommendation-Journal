@@ -6,7 +6,7 @@ import { confirmAction } from '@/lib/confirm';
 import { colors, space } from '@/lib/theme';
 import type { Category } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
-import { Panel, useOpening } from './Panel';
+import { Panel, useCloseHandler, useCloseRequest, useOpening } from './Panel';
 import { Button, Muted, Row } from './ui';
 
 interface Props {
@@ -19,14 +19,17 @@ interface Props {
 
 export function CategoryEditor(props: Props) {
   const opening = useOpening(props);
+  const { register, requestClose } = useCloseRequest(props.onClose);
   return (
-    <Panel visible={props.visible} onClose={props.onClose}>
-      {opening.key > 0 && <CategoryForm key={opening.key} {...opening.props} />}
+    <Panel visible={props.visible} onClose={requestClose}>
+      {opening.key > 0 && <CategoryForm key={opening.key} {...opening.props} registerClose={register} />}
     </Panel>
   );
 }
 
-function CategoryForm({ category, onClose, onSaved }: Props) {
+function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
+  registerClose?: (fn: (() => void) | null) => void;
+}) {
   const { items } = useData();
   const [draft, setDraft] = useState<CategoryDraft>(() => category
     ? { name: category.name, noun: category.noun, wantLabel: category.wantLabel, doneLabel: category.doneLabel }
@@ -54,6 +57,8 @@ function CategoryForm({ category, onClose, onSaved }: Props) {
       setBusy(false);
     }
   };
+
+  useCloseHandler(registerClose, onClose); // closing without saving just closes
 
   const remove = async () => {
     if (!category) return;
@@ -86,12 +91,6 @@ function CategoryForm({ category, onClose, onSaved }: Props) {
       {category && <Muted>Hidden categories are left off the list and the add screen. Their recommendations are kept.</Muted>}
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
       <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
-      {category && (
-        <Text style={{ color: colors.danger }}>
-          Deleting this category deletes ALL {count ? `${count} ` : ''}recommendation{count === 1 ? '' : 's'} in it, here and in your
-          Google Sheet. To keep them, hide it instead.
-        </Text>
-      )}
       {category && <Button title="Delete category" onPress={remove} small color={colors.chip} textColor={colors.danger} />}
     </ScrollView>
   );
