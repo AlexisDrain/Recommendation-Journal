@@ -58,9 +58,10 @@ function CategoryForm({ category, onClose, onSaved }: Props) {
   const remove = async () => {
     if (!category) return;
     const ok = await confirmAction(
-      `Delete “${category.name}”?`,
-      count ? `Its ${count} recommendation${count === 1 ? '' : 's'} will be deleted too. To keep them, hide the category instead.` : undefined,
-      'Delete',
+      `Delete “${category.name}” and ALL its recommendations?`,
+      `${count ? `All ${count} recommendation${count === 1 ? '' : 's'} in it will be deleted` : 'It will be deleted'}, on this device and from ` +
+      'your Google Sheet if one is connected. This can’t be undone. To keep them, hide the category instead.',
+      'Delete all',
     );
     if (!ok) return;
     await store.categories.remove(category.uid);
@@ -85,6 +86,12 @@ function CategoryForm({ category, onClose, onSaved }: Props) {
       {category && <Muted>Hidden categories are left off the list and the add screen. Their recommendations are kept.</Muted>}
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
       <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
+      {category && (
+        <Text style={{ color: colors.danger }}>
+          Deleting this category deletes ALL {count ? `${count} ` : ''}recommendation{count === 1 ? '' : 's'} in it, here and in your
+          Google Sheet. To keep them, hide it instead.
+        </Text>
+      )}
       {category && <Button title="Delete category" onPress={remove} small color={colors.chip} textColor={colors.danger} />}
     </ScrollView>
   );

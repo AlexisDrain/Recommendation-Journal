@@ -7,6 +7,7 @@ import { CategoryPicker, CategoryTabs } from '@/components/CategoryTabs';
 import { CategoryEditor } from '@/components/CategoryEditor';
 import { ItemEditor, type ItemDraft } from '@/components/ItemEditor';
 import { ItemRow } from '@/components/ItemRow';
+import { SortableList } from '@/components/SortableList';
 import { SyncChip } from '@/components/SyncChip';
 import { Toast, type ToastMessage } from '@/components/Toast';
 import { Chip, ErrorBox, Muted, styles } from '@/components/ui';
@@ -19,8 +20,17 @@ import { colors, radius, space } from '@/lib/theme';
 import type { Item, Status } from '@/lib/types';
 import { page, useWide, WIDE_PAGE } from '@/lib/useLayout';
 
-type Sort = 'newest' | 'title' | 'rating';
-const SORTS: [Sort, string][] = [['newest', 'Newest'], ['title', 'A–Z'], ['rating', 'Best rated']];
+type Sort = 'manual' | 'newest' | 'title' | 'rating';
+const SORTS: [Sort, string][] = [['manual', 'My order'], ['newest', 'Newest'], ['title', 'A–Z'], ['rating', 'Best rated']];
+
+/** The sort you picked last (remembered on this device). "My order" starts as newest first. */
+const SORT_KEY = 'recjournal.sort.v1';
+let lastSort: Sort = 'manual';
+AsyncStorage.getItem(SORT_KEY).then((v) => { if (SORTS.some(([s]) => s === v)) lastSort = v as Sort; }, () => {});
+function rememberSort(sort: Sort) {
+  lastSort = sort;
+  AsyncStorage.setItem(SORT_KEY, sort).catch(() => {});
+}
 
 /** The category new things go into while "All" is showing: the one used last (remembered on this device). */
 const LAST_KEY = 'recjournal.lastCategory.v1';
@@ -35,9 +45,16 @@ export default function ListScreen() {
   useThemeName(); // redraw when the display changes (dark / light)
   const { categories, items, loaded, error } = useData();
   const [query, setQuery] = useState('');
-  const [categoryUid, setCategoryUid] = useState<string | 'all'>('all');
+  /** A category's uid, 'all', or 'upnext'. */
+  const [categoryUid, setCategoryUid] = useState<string>('all');
   const [status, setStatus] = useState<Status | 'all'>('all');
-  const [sort, setSort] = useState<Sort>('newest');
+  const [sort, setSortState] = useState<Sort>(lastSort);
+  /** "My order" with the ≡ grips showing (iOS-style: a button switches dragging on and off). */
+  const [rearranging, setRearranging] = useState(false);
+  const setSort = (next: Sort) => {
+    setSortState(next);
+    rememberSort(next);
+  };
   const [editing, setEditing] = useState<Item | null>(null);
   const [adding, setAdding] = useState<Partial<ItemDraft> | null>(null);
   const [newCategory, setNewCategory] = useState(false);
@@ -47,28 +64,32 @@ export default function ListScreen() {
 
   const visible = useMemo(() => categories.filter((c) => !c.hidden), [categories]);
   const byUid = useMemo(() => new Map(categories.map((c) => [c.uid, c])), [categories]);
-  const selected = categoryUid === 'all' ? null : byUid.get(categoryUid) ?? null;
+  const selected = byUid.get(categoryUid) ?? null;
+  const upNextMode = categoryUid === 'upnext';
   const hiddenUids = useMemo(() => new Set(categories.filter((c) => c.hidden).map((c) => c.uid)), [categories]);
 
   // Searching looks through everything; the chips narrow it down.
   const inCategory = useMemo(
-    () => items.filter((i) => (selected ? i.categoryUid === selected.uid : !hiddenUids.has(i.categoryUid))),
-    [items, selected, hiddenUids],
+    () => items.filter((i) => (selected ? i.categoryUid === selected.uid : !hiddenUids.has(i.categoryUid) && (!upNextMode || i.queuePos != null))),
+    [items, selected, hiddenUids, upNextMode],
   );
+  const queue = useMemo(() => store.upNext.list(inCategory), [inCategory]);
   const shown = useMemo(() => {
     let list = search(inCategory, categories, query).filter((i) => status === 'all' || i.status === status);
     if (!query) {
+      if (sort === 'manual') list = [...list].sort((a, b) => b.manualPos - a.manualPos);
       if (sort === 'title') list = [...list].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
       if (sort === 'rating') list = [...list].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     }
     return list;
   }, [inCategory, categories, query, status, sort]);
   const perCategory = useMemo(() => {
-    const m = new Map<string, number>([['all', 0]]);
+    const m = new Map<string, number>([['all', 0], ['upnext', 0]]);
     for (const i of items) {
       if (hiddenUids.has(i.categoryUid)) continue;
       m.set(i.categoryUid, (m.get(i.categoryUid) ?? 0) + 1);
       m.set('all', m.get('all')! + 1);
+      if (i.queuePos != null) m.set('upnext', m.get('upnext')! + 1);
     }
     return m;
   }, [items, hiddenUids]);
@@ -83,7 +104,8 @@ export default function ListScreen() {
   const startAdd = () => setAdding({
     title: query.trim(),
     categoryUid: addTo?.uid,
-    status: status === 'done' ? 'done' : 'want',
+    status: status === 'done' && !upNextMode ? 'done' : 'want',
+    upNext: upNextMode, // added while looking at Up next: it goes on Up next
   });
 
   const onPress = useCallback((item: Item) => setEditing(item), []);
@@ -108,9 +130,9 @@ export default function ListScreen() {
 
   if (error) return <View style={[styles.screen, { padding: space.lg }]}><ErrorBox message={error} onRetry={() => void reload()} /></View>;
 
-  const pickCategory = (uid: string | 'all') => {
+  const pickCategory = (uid: string) => {
     setCategoryUid(uid);
-    if (uid !== 'all') rememberCategory(uid);
+    if (byUid.has(uid)) rememberCategory(uid);
   };
   const tabProps = { categories: visible, counts: perCategory, selected: categoryUid, onSelect: pickCategory, onNew: () => setNewCategory(true) };
 
@@ -138,6 +160,18 @@ export default function ListScreen() {
 
       {!wide && <CategoryPicker {...tabProps} />}
 
+      {upNextMode ? (
+        <View style={[styles.chips, { alignItems: 'center' }]}>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Muted>
+              {queue.length
+                ? 'What you want to get to soon. Drag ≡ to change the order; done things leave the list.'
+                : 'Nothing here yet. Open something on your list and tap “★ Up next” to put it here.'}
+            </Muted>
+          </View>
+          <SyncChip />
+        </View>
+      ) : (
       <View style={[styles.chips, { alignItems: 'center' }]}>
         {statusChip('all', 'All')}
         {statusChip('want', `${selected?.wantLabel ?? 'Not experienced yet'} ${counts.want}`)}
@@ -145,10 +179,15 @@ export default function ListScreen() {
         <View style={{ flex: 1 }} />
         <SyncChip />
       </View>
-      {!query && items.length > 1 && (
+      )}
+      {!query && !upNextMode && items.length > 1 && (
         <View style={[styles.chips, { alignItems: 'center' }]}>
           <Muted>Sort</Muted>
-          {SORTS.map(([s, label]) => <Chip key={s} label={label} selected={sort === s} onPress={() => setSort(s)} />)}
+          {SORTS.map(([s, label]) => <Chip key={s} label={label} selected={sort === s} onPress={() => { setSort(s); setRearranging(false); }} />)}
+          {sort === 'manual' && (
+            <Chip label={rearranging ? '✓ Done' : '↕ Rearrange'} selected={rearranging} color={colors.warm}
+              onPress={() => setRearranging(!rearranging)} />
+          )}
         </View>
       )}
 
@@ -173,6 +212,26 @@ export default function ListScreen() {
             <CategoryTabs {...tabProps} />
           </ScrollView>
         )}
+        {(upNextMode || (sort === 'manual' && rearranging)) && !query ? (
+          // Up next, and "My order" while rearranging: drag ≡ to put in order. Not a FlatList (the rows
+          // move while you drag), so every row is drawn: fine for these, too slow as the everyday view
+          // of a long list.
+          <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}>
+            {header}
+            <SortableList data={upNextMode ? queue : shown} keyOf={(i) => i.uid} label="recommendation"
+              onReorder={(next) => (upNextMode ? store.upNext.reorder : store.items.reorder)(next.map((i) => i.uid))
+                .catch((e) => setToast({ text: (e as Error).message }))}
+              renderRow={(item) => (
+                <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected} onPress={onPress} flush />
+              )} />
+            {!upNextMode && shown.length === 0 && loaded && (
+              <View style={{ padding: space.xl, alignItems: 'center' }}>
+                <Muted>{items.length ? 'Nothing here yet.' : 'Type a title in the box above and press Enter to add your first recommendation.'}</Muted>
+              </View>
+            )}
+          </ScrollView>
+        ) : (
         <FlatList
           style={{ flex: 1 }}
           data={shown}
@@ -195,6 +254,7 @@ export default function ListScreen() {
             </View>
           ) : null}
         />
+        )}
       </View>
 
       <ItemEditor visible={!!editing} item={editing} onClose={() => setEditing(null)}

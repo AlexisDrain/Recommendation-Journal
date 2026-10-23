@@ -45,10 +45,14 @@ export interface Item {
   recommendedOn: string | null;
   /** When you watched / read / played it. */
   doneOn: string | null;
+  /** Its place on "Up next" (1 = first), or null when it isn't on it. */
+  queuePos: number | null;
+  /** Its place in "My order": higher comes first. */
+  manualPos: number;
   deleted: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export type ItemPatch = Partial<Pick<Item, 'categoryUid' | 'title' | 'author' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>>;
+export type ItemPatch = Partial<Pick<Item, 'categoryUid' | 'title' | 'author' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn' | 'queuePos'>>;
 export type CategoryPatch = Partial<Pick<Category, 'name' | 'noun' | 'wantLabel' | 'doneLabel' | 'hidden'>>;

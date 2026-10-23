@@ -32,7 +32,7 @@
  * Bump this whenever the script changes in a way the app should know about. The app compares it
  * with the version it was built for and tells the user when their sheet's script is out of date.
  */
-const SCRIPT_VERSION = 3;
+const SCRIPT_VERSION = 5;
 
 const CATEGORIES_TAB = 'Categories';
 const DELETED_TAB = 'Deleted';
@@ -40,9 +40,11 @@ const UPDATED = 'Updated';
 // "Changed": when this script or a hand edit last wrote the row (hidden). The app asks for rows
 // changed since its last sync by this, so it never misses an edit another device sent late.
 const CHANGED = 'Changed';
+// "List order": your own order in the app ("My order"; higher comes first). Hidden, like Changed.
+const ORDER = 'List order';
 const CAT_COLS = ['Id', 'Name', 'One is called', 'On your list', 'Done', 'Order', 'Hidden', 'Deleted', UPDATED];
-const ITEM_COLS = ['Title', 'Author', 'Status', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on', 'Id', UPDATED, CHANGED];
-const ITEM_WIDTHS = [260, 180, 130, 130, 160, 320, 120, 120, 130, 160, 160];
+const ITEM_COLS = ['Title', 'Author', 'Status', 'Up next', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on', 'Id', UPDATED, CHANGED, ORDER];
+const ITEM_WIDTHS = [260, 180, 130, 70, 130, 160, 320, 120, 120, 130, 160, 160, 90];
 const RATINGS = ['❌ Bad', '✅ Average', '👍 Great', '❤️ Exceptional'];
 const HEADER_COLOR = '#c9cdf5';
 const SYSTEM_COLOR = '#e4e6f2'; // Id / Updated: the app's bookkeeping
@@ -317,7 +319,7 @@ function ensureTabs_(ctx, cats) {
     setProp_(ctx, 'TAB_' + c.id, t.id);
     setProp_(ctx, 'TABNAME_' + c.id, t.name);
     // Columns, drop-downs and hiding: only when the category's words or "hidden" changed.
-    const layout = JSON.stringify([3, c.want, c.done, c.hidden]);
+    const layout = JSON.stringify([5, c.want, c.done, c.hidden]);
     if (prop_(ctx, 'LAYOUT_' + t.id) !== layout) {
       ensureItemColumns_(t.sh);
       applyChoices_(t.sh, c);
@@ -627,7 +629,7 @@ function ensureItemColumns_(sh) {
     const at = headers.length + 1;
     if (sh.getMaxColumns() < at) sh.insertColumnsAfter(sh.getMaxColumns(), at - sh.getMaxColumns());
     headers[at - 1] = h;
-    const system = h === 'Id' || h === UPDATED || h === CHANGED;
+    const system = h === 'Id' || h === UPDATED || h === CHANGED || h === ORDER;
     sh.getRange(1, at).setValue(h).setFontWeight('bold').setBackground(system ? SYSTEM_COLOR : HEADER_COLOR);
     const body = sh.getRange(2, at, Math.max(sh.getMaxRows() - 1, 1), 1);
     body.setNumberFormat('@'); // text: stops Sheets turning dates and "1/2" into something else
@@ -635,7 +637,7 @@ function ensureItemColumns_(sh) {
     else body.setWrap(h === 'Why');
     sh.setColumnWidth(at, ITEM_WIDTHS[i]);
     if (h === 'Id') sh.getRange(1, at).setNote('Leave Id, Updated and Changed alone: the app uses them to keep this sheet and your devices in step.');
-    if (h === CHANGED) sh.hideColumns(at);
+    if (h === CHANGED || h === ORDER) sh.hideColumns(at);
   });
 }
 

@@ -12,7 +12,7 @@ import { suggestWords } from '@/lib/categories';
 import { stamp } from '@/lib/dates';
 import { secureStorage } from '@/lib/secureStorage';
 import type { Category } from '@/lib/types';
-import { itemCells, mapHeader, rowFields } from './rowFormat';
+import { itemCells, mapHeader, ORDER_COLUMN, rowFields } from './rowFormat';
 import { allCategories, allItems, getDb, onLocalChange, reload, writeCategory, writeItem } from './store';
 import { transaction } from './transaction';
 
@@ -20,7 +20,7 @@ const CONNECTION_KEY = 'recjournal.sheetConnection';
 const STATE_KEY = 'recjournal.sheetSync.v1';
 const PUSH_BATCH = 300;
 /** The version of google-sheets/RecommendationJournalSync.gs this app was built for (its SCRIPT_VERSION). */
-export const LATEST_SCRIPT_VERSION = 3;
+export const LATEST_SCRIPT_VERSION = 5;
 
 export interface Connection { url: string; secret: string }
 
@@ -232,7 +232,7 @@ async function runSync() {
     const changed = (await allItems()).filter((i) => i.updatedAt > state.lastPushed);
     const sent = changed.map((i) => ({
       id: i.uid, category: i.categoryUid, deleted: i.deleted, updated: i.updatedAt,
-      values: i.deleted ? {} : itemCells(i, byUid.get(i.categoryUid)),
+      values: i.deleted ? {} : { ...itemCells(i, byUid.get(i.categoryUid)), [ORDER_COLUMN]: String(i.manualPos) },
     }));
 
     // Big first syncs go in batches; the last request also brings back the sheet's changes.
@@ -307,7 +307,9 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
       const header = Object.keys(r.cells);
       const fields = rowFields(mapHeader(header), header.map((h) => r.cells[h]), local.get(r.category), false);
       if (!fields) continue;
-      await writeItem(tx, { uid: r.id, categoryUid: r.category, deleted: false, updatedAt: r.updated, ...fields, author: fields.author ?? mine?.author ?? '' });
+      await writeItem(tx, { uid: r.id, categoryUid: r.category, deleted: false, updatedAt: r.updated, ...fields, author: fields.author ?? mine?.author ?? '',
+        queuePos: fields.queuePos !== undefined ? fields.queuePos : mine?.queuePos ?? null,
+        manualPos: fields.manualPos ?? null });
       count++;
     }
     for (const d of answer.deleted ?? []) {

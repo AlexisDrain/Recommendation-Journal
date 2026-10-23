@@ -9,10 +9,12 @@ import { parseDate } from '@/lib/dates';
 import { parseRating, ratingText } from '@/lib/rating';
 import type { Category, Item, Status } from '@/lib/types';
 
-export const COLUMNS = ['Title', 'Author', 'Status', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on'] as const;
+export const COLUMNS = ['Title', 'Author', 'Status', 'Up next', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on'] as const;
+/** Kept in the Google Sheet (hidden) but not shown in the app's Sheet tab or the exports. */
+export const ORDER_COLUMN = 'List order';
 export type Column = (typeof COLUMNS)[number];
 export const WIDTHS: Record<Column, number> = {
-  Title: 36, Author: 22, Status: 16, Rating: 16, 'Recommended by': 22, Why: 48, 'Recommended on': 15, 'Experienced on': 15,
+  Title: 36, Author: 22, Status: 16, 'Up next': 9, Rating: 16, 'Recommended by': 22, Why: 48, 'Recommended on': 15, 'Experienced on': 15,
 };
 
 /** One item as the cells of a row. */
@@ -21,6 +23,7 @@ export function itemCells(it: Item, cat: Pick<Category, 'wantLabel' | 'doneLabel
     Title: it.title,
     Author: it.author,
     Status: it.status === 'done' ? cat?.doneLabel || 'Done' : cat?.wantLabel || 'Want to',
+    'Up next': it.queuePos != null ? String(it.queuePos) : '',
     Rating: ratingText(it.rating),
     'Recommended by': it.recommendedBy,
     Why: it.note,
@@ -34,6 +37,7 @@ const ALIASES: Record<Column | 'Category', string[]> = {
   Title: ['title', 'name', 'media', 'media name', 'item', 'book', 'movie', 'film', 'game', 'show', 'album', 'recipe', 'what'],
   Author: ['author', 'creator', 'director', 'artist', 'writer', 'written by', 'directed by', 'made by', 'developer', 'studio',
     'band', 'musician', 'chef', 'host'],
+  'Up next': ['up next', 'queue', 'priority', 'rank', 'ranking', 'watch soon', 'read soon', 'next'],
   Status: ['status', 'state', 'seen', 'done', 'watched', 'read', 'played', 'finished', 'have i'],
   Rating: ['rating', 'rated', 'score', 'stars', 'exceptional', 'my rating', 'verdict', 'opinion', 'liked it'],
   'Recommended by': ['recommended by', 'by', 'from', 'who', 'recommender', 'person', 'source', 'who told me', 'suggested by'],
@@ -45,9 +49,9 @@ const ALIASES: Record<Column | 'Category', string[]> = {
 };
 
 /** The app's columns ignore these when finding "other" columns to keep in the note. */
-const BOOKKEEPING = new Set(['id', 'updated', 'changed']);
+const BOOKKEEPING = new Set(['id', 'updated', 'changed', 'list order']);
 
-export interface HeaderMap { col: Partial<Record<Column | 'Category', number>>; extra: { index: number; name: string }[] }
+export interface HeaderMap { col: Partial<Record<Column | 'Category', number>>; extra: { index: number; name: string }[]; order?: number }
 
 /** Works out which column holds what. The first column with a matching name wins. */
 export function mapHeader(header: string[]): HeaderMap {
@@ -66,7 +70,8 @@ export function mapHeader(header: string[]): HeaderMap {
   const extra = header
     .map((name, index) => ({ index, name: name.trim() }))
     .filter((h) => h.name && !used.has(h.index) && !BOOKKEEPING.has(normalize(h.name)));
-  return { col, extra };
+  const order = names.indexOf(normalize(ORDER_COLUMN));
+  return { col, extra, ...(order >= 0 && { order }) };
 }
 
 const DONE_WORDS = /^(done|yes|y|true|x|✓|✔|seen|watched|read|played|listened|cooked|tried|visited|experienced|finished|completed|had)$/;
@@ -84,8 +89,8 @@ export function parseStatus(raw: string, cat: Pick<Category, 'wantLabel' | 'done
   return hints.rating || hints.doneOn ? 'done' : 'want';
 }
 
-/** `author` is left out when the row has no Author column (an older sheet), so it isn't wiped. */
-export type RowFields = { author?: string } & Pick<Item, 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>;
+/** `author` / `queuePos` are left out when the row has no such column (an older sheet), so they aren't wiped. */
+export type RowFields = { author?: string; queuePos?: number | null; manualPos?: number | null } & Pick<Item, 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>;
 
 /**
  * A row's cells → an item's fields, or null for a row without a title.
@@ -110,6 +115,8 @@ export function rowFields(map: HeaderMap, row: string[], cat: Pick<Category, 'wa
   return {
     title,
     ...(map.col.Author !== undefined && { author: get('Author') }),
+    ...(map.order !== undefined && { manualPos: Number.isFinite(Number(row[map.order])) && String(row[map.order]).trim() !== '' ? Number(row[map.order]) : null }),
+    ...(map.col['Up next'] !== undefined && { queuePos: /^\d+$/.test(get('Up next')) && Number(get('Up next')) > 0 ? Number(get('Up next')) : null }),
     status: parseStatus(get('Status'), cat, { rating: !!rating, doneOn: !!doneOn }),
     rating,
     recommendedBy: get('Recommended by'),

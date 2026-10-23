@@ -25,6 +25,8 @@ export interface ItemDraft {
   note: string;
   recommendedOn: string | null;
   doneOn: string | null;
+  /** On Up next (placed at the end when added). */
+  upNext?: boolean;
 }
 
 interface Props {
@@ -50,7 +52,7 @@ export function ItemEditor(props: Props) {
 function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
   const { categories, items } = useData();
   const shown = categories.filter((c) => !c.hidden || c.uid === item?.categoryUid);
-  const [draft, setDraft] = useState<ItemDraft>(() => item ? { ...item } : {
+  const [draft, setDraft] = useState<ItemDraft>(() => item ? { ...item, upNext: item.queuePos != null } : {
     title: '', author: '', categoryUid: shown[0]?.uid ?? '', status: 'want', rating: null, recommendedBy: '', note: '',
     recommendedOn: today(), doneOn: null, ...start,
   });
@@ -77,12 +79,18 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
         categoryUid = (await store.categories.create(newCategory)).uid;
       }
       if (!categoryUid) throw new Error('Pick a category.');
-      const fields = { ...draft, categoryUid };
+      const { upNext, ...rest } = draft;
+      const fields = { ...rest, categoryUid, queuePos: undefined };
+      const wanted = !!upNext && draft.status === 'want'; // done things leave Up next
       if (item) {
         await store.items.update(item.uid, fields);
+        if (wanted && item.queuePos == null) await store.upNext.add(item.uid);
+        if (!wanted && item.queuePos != null && draft.status === 'want') await store.upNext.remove(item.uid);
         onSaved?.(null, false);
       } else {
-        onSaved?.(await store.items.create(fields), true);
+        const created = await store.items.create(fields);
+        if (wanted) await store.upNext.add(created.uid);
+        onSaved?.(created, true);
       }
       onClose();
     } catch (e) {
@@ -102,10 +110,15 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', flex: 1 }}>
           {item ? 'Edit' : `Add ${withArticle(category?.noun || 'recommendation')}`}
         </Text>
-        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+        {/* Up next: a pin on the thing itself, apart from its status. Done things aren't on it. */}
+        {draft.status === 'want' && (
+          <Chip label={draft.upNext ? `★ Up next${item?.queuePos ? ` #${item.queuePos}` : ''}` : '☆ Up next'} selected={!!draft.upNext}
+            color={colors.warm} onPress={() => set({ upNext: !draft.upNext })} />
+        )}
+        <Pressable onPress={onClose} style={{ marginLeft: space.md }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
           <Text style={{ color: colors.muted, fontSize: 22 }}>×</Text>
         </Pressable>
       </View>
@@ -132,15 +145,6 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
           }} />
       )}
 
-      <View style={[styles.chips, { alignItems: 'center' }]}>
-        <Text style={{ color: colors.muted, marginRight: space.xs }}>Your rating</Text>
-        {RATINGS.map((r) => (
-          <Chip key={r.value} label={`${r.emoji} ${r.label}`} selected={draft.rating === r.value}
-            onPress={() => draft.rating === r.value ? set({ rating: null })
-              : set({ rating: r.value, status: 'done', doneOn: draft.doneOn ?? today() })} />
-        ))}
-      </View>
-
       <Input placeholder="Who recommended it? (my brother, a stranger in the park…)" value={draft.recommendedBy}
         onChangeText={(recommendedBy) => set({ recommendedBy })} accessibilityLabel="Recommended by" />
       {suggestions.length > 0 && (
@@ -157,6 +161,15 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted }: Props) {
           onPress={() => set({ status: 'want', rating: null })} />
         <Chip label={category?.doneLabel || 'Done'} selected={draft.status === 'done'} color={colors.success}
           onPress={() => set({ status: 'done', doneOn: draft.doneOn ?? today() })} />
+      </View>
+
+      <View style={[styles.chips, { alignItems: 'center' }]}>
+        <Text style={{ color: colors.muted, marginRight: space.xs }}>Your rating</Text>
+        {RATINGS.map((r) => (
+          <Chip key={r.value} label={`${r.emoji} ${r.label}`} selected={draft.rating === r.value}
+            onPress={() => draft.rating === r.value ? set({ rating: null })
+              : set({ rating: r.value, status: 'done', doneOn: draft.doneOn ?? today() })} />
+        ))}
       </View>
 
       <DateField label="Recommended on" value={draft.recommendedOn} onChange={(recommendedOn) => set({ recommendedOn })} />

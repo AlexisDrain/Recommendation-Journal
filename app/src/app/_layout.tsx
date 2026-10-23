@@ -7,12 +7,14 @@ import { requestSync } from '@/db/sync';
 import { useDisplayModeLoaded, useThemeName } from '@/lib/displayMode';
 import { colors } from '@/lib/theme';
 import { installWebHead } from '@/lib/webHead';
+import { useWelcomeSeen } from '@/lib/welcome';
 
 installWebHead();
 
 export default function RootLayout() {
   const theme = useThemeName();
   const displayLoaded = useDisplayModeLoaded();
+  const welcomeSeen = useWelcomeSeen();
 
   // Pick up changes from the Google Sheet (if connected) on launch and when the app comes back.
   useEffect(() => {
@@ -21,13 +23,21 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  if (!displayLoaded) return null; // reading the saved display setting (a few ms)
+  if (welcomeSeen === null || !displayLoaded) return null; // reading saved settings (a few ms)
+
+  // Until the welcome is finished only the welcome screen exists; finishing it flips the guards
+  // and Expo Router moves to the tabs on its own.
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Screen name="(tabs)" />
+        <Stack.Protected guard={welcomeSeen}>
+          <Stack.Screen name="(tabs)" />
+        </Stack.Protected>
+        <Stack.Protected guard={!welcomeSeen}>
+          <Stack.Screen name="welcome" />
+        </Stack.Protected>
       </Stack>
     </GestureHandlerRootView>
   );

@@ -42,7 +42,7 @@ const SELECT_CATEGORY = `
 
 const SELECT_ITEM = `
   SELECT id, uid, category_uid AS categoryUid, title, author, status, rating, recommended_by AS recommendedBy, note,
-         recommended_on AS recommendedOn, done_on AS doneOn, deleted, created_at AS createdAt, updated_at AS updatedAt
+         recommended_on AS recommendedOn, done_on AS doneOn, queue_pos AS queuePos, manual_pos AS manualPos, deleted, created_at AS createdAt, updated_at AS updatedAt
   FROM items`;
 
 type Bools<T, K extends keyof T> = Omit<T, K> & Record<K, number>;
@@ -180,6 +180,7 @@ const ITEM_COLUMNS = {
   note: 'note',
   recommendedOn: 'recommended_on',
   doneOn: 'done_on',
+  queuePos: 'queue_pos',
 } as const;
 
 /** Tidies a patch: trims text, and stamps "done on" today when something is first marked done. */
@@ -189,6 +190,7 @@ function cleanPatch(patch: ItemPatch, before?: Item): ItemPatch {
   if (p.rating && p.status === undefined && before?.status === 'want') p.status = 'done'; // rating it = you've had it
   if (p.status === 'done' && before?.status !== 'done' && p.doneOn === undefined && !before?.doneOn) p.doneOn = today();
   if (p.status === 'want' && before?.status === 'done' && p.doneOn === undefined) p.doneOn = null;
+  if (p.status === 'done' && p.queuePos === undefined && before?.queuePos != null) p.queuePos = null; // done: off Up next
   return p;
 }
 
@@ -201,7 +203,8 @@ const items = {
     const uid = newUid();
     const cols = Object.entries(ITEM_COLUMNS).filter(([k]) => p[k as keyof ItemPatch] !== undefined);
     await db.runAsync(
-      `INSERT INTO items (uid, updated_at${cols.map(([, c]) => `, ${c}`).join('')}) VALUES (?, ?${', ?'.repeat(cols.length)})`,
+      `INSERT INTO items (uid, updated_at, manual_pos${cols.map(([, c]) => `, ${c}`).join('')})
+       VALUES (?, ?, (SELECT coalesce(max(manual_pos), 0) + 1 FROM items)${', ?'.repeat(cols.length)})`,
       [uid, stamp(), ...cols.map(([k]) => p[k as keyof ItemPatch] ?? null)],
     );
     await changed();
@@ -233,17 +236,70 @@ const items = {
   },
 };
 
+/**
+ * "My order": puts these items in this order (after a drag), using the places they already had,
+ * so items that weren't shown (other categories, filtered out) keep theirs. Only the items whose
+ * place changed are stamped, so only they sync.
+ */
+async function reorderManually(uids: string[]) {
+  const pos = new Map(data.items.map((i) => [i.uid, i.manualPos]));
+  const places = uids.map((u) => pos.get(u) ?? 0).sort((a, b) => b - a); // highest first
+  const db = await getDb();
+  const now = stamp();
+  await transaction(db, async (tx) => {
+    for (const [i, uid] of uids.entries()) {
+      if (pos.get(uid) !== places[i]) await tx.runAsync(`UPDATE items SET manual_pos = ?, updated_at = ? WHERE uid = ?`, places[i], now, uid);
+    }
+  });
+  await changed();
+}
+
+/** "Up next": the things you mean to get to soon, in your own order. */
+const upNext = {
+  /** On Up next, in order. */
+  list: (all = data.items) => all.filter((i) => i.queuePos != null).sort((a, b) => a.queuePos! - b.queuePos!),
+
+  /** Puts an item at the end of Up next. */
+  add: async (uid: string) => {
+    const last = upNext.list().reduce((m, i) => Math.max(m, i.queuePos!), 0);
+    await items.update(uid, { queuePos: last + 1 });
+  },
+
+  /** Takes an item off Up next, and closes the gap it leaves. */
+  remove: async (uid: string) => {
+    await upNext.reorder(upNext.list().map((i) => i.uid).filter((u) => u !== uid), uid);
+  },
+
+  /**
+   * Numbers Up next 1, 2, 3… in the given order. Only items whose place changed are stamped, so
+   * only they are sent to the sheet. `drop`: also take this item off.
+   */
+  reorder: async (uids: string[], drop?: string) => {
+    const db = await getDb();
+    const now = stamp();
+    const pos = new Map(data.items.map((i) => [i.uid, i.queuePos]));
+    await transaction(db, async (tx) => {
+      for (const [i, uid] of uids.entries()) {
+        if (pos.get(uid) !== i + 1) await tx.runAsync(`UPDATE items SET queue_pos = ?, updated_at = ? WHERE uid = ?`, i + 1, now, uid);
+      }
+      if (drop) await tx.runAsync(`UPDATE items SET queue_pos = NULL, updated_at = ? WHERE uid = ?`, now, drop);
+    });
+    await changed();
+  },
+};
+
 /** Writes an item exactly as given (from the sheet or an import), keeping its `updatedAt`. */
-export async function writeItem(tx: SQLite.SQLiteDatabase, it: Omit<Item, 'id' | 'createdAt'> & { createdAt?: string }) {
+export async function writeItem(tx: SQLite.SQLiteDatabase, it: Omit<Item, 'id' | 'createdAt' | 'manualPos'> & { createdAt?: string; manualPos?: number | null }) {
   await tx.runAsync(
-    `INSERT INTO items (uid, category_uid, title, author, status, rating, recommended_by, note, recommended_on, done_on, deleted, updated_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, coalesce(?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))
+    `INSERT INTO items (uid, category_uid, title, author, status, rating, recommended_by, note, recommended_on, done_on, queue_pos, deleted, updated_at, created_at, manual_pos)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, coalesce(?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')), coalesce(?, (SELECT coalesce(max(manual_pos), 0) + 1 FROM items)))
      ON CONFLICT (uid) DO UPDATE SET
        category_uid = excluded.category_uid, title = excluded.title, author = excluded.author, status = excluded.status, rating = excluded.rating,
        recommended_by = excluded.recommended_by, note = excluded.note, recommended_on = excluded.recommended_on,
-       done_on = excluded.done_on, deleted = excluded.deleted, updated_at = excluded.updated_at`,
-    [it.uid, it.categoryUid, it.title, it.author, it.status, it.rating, it.recommendedBy, it.note, it.recommendedOn, it.doneOn,
-      Number(it.deleted), it.updatedAt, it.createdAt ?? null],
+       done_on = excluded.done_on, queue_pos = excluded.queue_pos, deleted = excluded.deleted, updated_at = excluded.updated_at,
+       manual_pos = coalesce(?, items.manual_pos)`,
+    [it.uid, it.categoryUid, it.title, it.author, it.status, it.rating, it.recommendedBy, it.note, it.recommendedOn, it.doneOn, it.queuePos,
+      Number(it.deleted), it.updatedAt, it.createdAt ?? null, it.manualPos ?? null, it.manualPos ?? null],
   );
 }
 
@@ -302,18 +358,14 @@ const categories = {
     await changed();
   },
 
-  /** Move one place up (-1) or down (1). Every category is renumbered and stamped, so the order syncs. */
-  move: async (uid: string, direction: -1 | 1) => {
-    const list = [...data.categories];
-    const from = list.findIndex((c) => c.uid === uid);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= list.length) return;
-    list.splice(to, 0, list.splice(from, 1)[0]);
+  /** Puts the categories in this order (after a drag). Only the ones that moved are stamped, so only they sync. */
+  reorder: async (uids: string[]) => {
     const db = await getDb();
     const now = stamp();
+    const order = new Map(data.categories.map((c) => [c.uid, c.sortOrder]));
     await transaction(db, async (tx) => {
-      for (const [i, c] of list.entries()) {
-        if (c.sortOrder !== i + 1) await tx.runAsync(`UPDATE categories SET sort_order = ?, updated_at = ? WHERE uid = ?`, i + 1, now, c.uid);
+      for (const [i, uid] of uids.entries()) {
+        if (order.get(uid) !== i + 1) await tx.runAsync(`UPDATE categories SET sort_order = ?, updated_at = ? WHERE uid = ?`, i + 1, now, uid);
       }
     });
     await changed();
@@ -343,4 +395,4 @@ export async function writeCategory(tx: SQLite.SQLiteDatabase, c: Omit<Category,
   );
 }
 
-export const store = { items, categories };
+export const store = { items: { ...items, reorder: reorderManually }, categories, upNext };

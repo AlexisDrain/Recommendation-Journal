@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
-import { CategoriesCard } from '@/components/CategoriesCard';
 import { GoogleSheetCard } from '@/components/GoogleSheetCard';
 import { Button, Card, Chip, ErrorBox, Muted, styles } from '@/components/ui';
 import { exportCsv, exportXlsx, pickAndImport } from '@/db/exchange';
@@ -10,6 +9,7 @@ import { DAY_ENDS, DAY_STARTS, setDisplayMode, useDisplayMode, useThemeName, typ
 import { REPO_URL } from '@/lib/links';
 import { colors } from '@/lib/theme';
 import { NARROW_PAGE, page } from '@/lib/useLayout';
+import { setWelcomeSeen } from '@/lib/welcome';
 
 const DISPLAY_MODES: [DisplayMode, string][] = [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Light by day, dark at night']];
 const hour = (h: number) => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
@@ -63,8 +63,6 @@ export default function SettingsScreen() {
         </Muted>
       </Card>
 
-      <CategoriesCard />
-
       <GoogleSheetCard />
 
       <Card title="Your data">
@@ -84,6 +82,12 @@ export default function SettingsScreen() {
         </Muted>
         <Button title="Import .xlsx or CSV" onPress={importFile} busy={busy === 'import'} small color={colors.chip} textColor={colors.text} />
         {importMsg && <Text style={{ color: colors.success }}>{importMsg}</Text>}
+      </Card>
+
+      <Card title="Welcome screen">
+        <Muted>The short overview of what the app is for, shown the first time you opened it.</Muted>
+        <Button title="Show the welcome again" onPress={() => setWelcomeSeen(false)} small
+          color={colors.chip} textColor={colors.text} />
       </Card>
 
       <Card title="About">

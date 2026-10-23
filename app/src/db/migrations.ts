@@ -92,6 +92,21 @@ export const MIGRATIONS: string[] = [
   UPDATE items SET author = 'Francis Ford Coppola' WHERE uid = 'example-godfather'    AND author = '';
   UPDATE items SET author = 'Orson Welles'         WHERE uid = 'example-citizen-kane' AND author = '';
   `,
+
+  // 5 — "Up next": things you mean to get to soon, in your own order (1 = first). NULL = not on it.
+  `
+  ALTER TABLE items ADD COLUMN queue_pos INTEGER CHECK (queue_pos IS NULL OR queue_pos >= 1);
+  -- The example still on the list starts out on Up next, so new users see what it is.
+  UPDATE items SET queue_pos = 1 WHERE uid = 'example-citizen-kane' AND status = 'want' AND deleted = 0
+    AND NOT EXISTS (SELECT 1 FROM items WHERE queue_pos IS NOT NULL);
+  `,
+
+  // 6 — "My order": your own order for the list, set by dragging. Higher comes first, so new
+  // things (max + 1) go on top. It starts as newest first, the order the list already had.
+  `
+  ALTER TABLE items ADD COLUMN manual_pos REAL;
+  UPDATE items SET manual_pos = (SELECT count(*) FROM items AS o WHERE o.created_at < items.created_at OR (o.created_at = items.created_at AND o.id <= items.id));
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase) {

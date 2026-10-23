@@ -1,0 +1,655 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recommendation Journal Trailer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap">
+<style>
+/* Layout: one 1280×720 stage, scaled to the window, playing timed scenes on a loop.
+   Single dark look on purpose: it is the app's own palette (dark by default). */
+:root {
+  color-scheme: dark;
+  --bg: #0e1120;      /* app background */
+  --card: #181c33;
+  --line: #262b4a;
+  --chip: #232846;
+  --text: #e8eaf6;
+  --muted: #8a90b2;
+  --accent: #9fa8ff;  /* buttons, selected */
+  --warm: #ffc47a;    /* on your list, Up next */
+  --green: #7be0a8;   /* done */
+  --sky: #070912;     /* around the stage */
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --ui: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+html, body { background: var(--sky); color: var(--text); }
+body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
+.viewport { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; overflow: hidden; border-radius: 14px; background: var(--bg); }
+.stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden;
+  background: radial-gradient(1200px 700px at 78% -10%, #1b2150 0%, var(--bg) 55%); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.bar button { font: 600 14px var(--ui); color: var(--text); background: var(--chip); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.progress { flex: 1; min-width: 120px; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); }
+.tip { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 70ch; }
+
+/* ---------- scenes ---------- */
+.scene { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; pointer-events: none; }
+.scene.on { opacity: 1; }
+.caption { position: absolute; left: 96px; top: 190px; width: 500px; }
+.eyebrow { font: 700 15px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 18px; }
+.caption h2 { font: 800 56px/1.04 var(--display); margin: 0 0 22px; text-wrap: balance; letter-spacing: -.01em; }
+.caption p { font-size: 21px; line-height: 1.5; color: var(--muted); margin: 0; }
+.caption p + p { margin-top: 10px; }
+.caption q { color: var(--text); }
+
+/* title + end card */
+.center { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; gap: 18px; }
+.mark { width: 124px; height: 124px; }
+.title { font: 800 92px/1 var(--display); letter-spacing: -.02em; margin: 0; }
+.sub { font-size: 26px; color: var(--muted); margin: 0; }
+.pill { display: inline-block; font: 700 18px var(--ui); color: var(--bg); background: var(--green); border-radius: 999px; padding: 8px 20px; }
+.links { display: grid; gap: 8px; font: 600 24px var(--ui); color: var(--text); }
+.links span { color: var(--muted); font-weight: 500; }
+.credit { position: absolute; left: 0; right: 0; bottom: 26px; margin: 0; text-align: center; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.brand { position: absolute; left: 40px; top: 32px; display: flex; align-items: center; gap: 10px; z-index: 8; transition: opacity .6s; }
+.brand svg { width: 32px; height: 32px; }
+.brand strong { font: 800 22px var(--display); }
+.brand span { font: 700 12px var(--ui); color: var(--bg); background: var(--green); border-radius: 999px; padding: 4px 10px; }
+
+/* phone */
+.phone { position: absolute; width: 340px; height: 640px; border-radius: 46px; background: #05060c; padding: 12px; box-shadow: 0 30px 80px #0009, 0 0 0 1px #2c3150; }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: var(--bg); }
+.notch { position: absolute; top: 10px; left: 50%; width: 96px; height: 26px; margin-left: -48px; border-radius: 14px; background: #05060c; z-index: 6; }
+.app { position: absolute; left: 0; right: 0; top: 0; padding: 48px 14px 70px; }
+.apptitle { font-size: 15px; font-weight: 700; margin: 0 2px 10px; }
+.tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 58px; background: var(--card); border-top: 1px solid var(--line); display: flex; justify-content: space-around; align-items: center; z-index: 2; }
+.tabs div { display: grid; justify-items: center; gap: 2px; font-size: 10px; color: var(--muted); }
+.tabs div b { font-size: 17px; font-weight: 400; }
+.tabs .cur { color: var(--text); }
+
+/* app pieces (drawn after the real app) */
+.search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; font-size: 13.5px; margin-bottom: 8px; }
+.search .ph { color: var(--muted); }
+.search .x { margin-left: auto; color: var(--muted); }
+.pick { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; font-size: 12px; margin-bottom: 8px; }
+.pick span { color: var(--muted); }
+.pick b { flex: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chipx { font-size: 11px; padding: 5px 10px; border-radius: 999px; background: var(--chip); border: 1px solid var(--line); color: var(--text); transition: all .3s; white-space: nowrap; }
+.chipx.sel { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
+.chipx.w.sel { background: var(--warm); border-color: var(--warm); }
+.chipx.g.sel { background: var(--green); border-color: var(--green); }
+.addbar { background: var(--accent); color: var(--bg); border-radius: 12px; padding: 10px 12px; font-weight: 700; font-size: 12.5px; margin-bottom: 10px; transition: opacity .3s; }
+.irow { position: relative; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--warm); border-radius: 12px; padding: 9px 10px 9px 12px; margin-bottom: 8px;
+  overflow: hidden; max-height: 120px; transition: max-height .35s, padding .35s, margin .35s, opacity .3s, border-color .4s, box-shadow .4s; }
+.irow.done { border-left-color: var(--green); }
+.irow.gone { max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; opacity: 0; border-width: 0; }
+.irow.flash { box-shadow: inset 0 0 0 999px #9fa8ff2a; }
+.irow .t { font-size: 14px; font-weight: 600; }
+.irow .t i { color: var(--warm); font-style: normal; }
+.irow .m { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.irow .n { font-size: 11.5px; font-style: italic; color: #cfd2ea; margin-top: 3px; }
+.irow .r { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; }
+.irow .grip { position: absolute; right: 0; top: 0; bottom: 0; width: 36px; display: grid; place-items: center; color: var(--muted); font-size: 19px; }
+.muted { color: var(--muted); font-size: 11px; line-height: 1.45; margin-bottom: 10px; }
+.queue { position: relative; height: 290px; }
+.queue .irow { position: absolute; left: 0; right: 0; height: 80px; margin: 0; padding-right: 40px; transition: top .25s ease, box-shadow .2s, transform .2s, border-color .4s; }
+.queue .irow.lift { transition: box-shadow .2s, transform .2s; transform: scale(1.03); box-shadow: 0 12px 30px #000a; z-index: 3; }
+.caret { display: inline-block; width: 1px; height: 13px; background: var(--text); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.toast { position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); background: var(--text); color: var(--bg); border-radius: 10px; padding: 9px 12px; font-size: 11.5px; white-space: nowrap; opacity: 0; transition: opacity .3s; z-index: 3; }
+.toast b { margin-left: 10px; text-decoration: underline; }
+.toast.on { opacity: 1; }
+
+/* the add / edit panel: slides up from the bottom */
+.dim { position: absolute; inset: 0; background: #0009; opacity: 0; transition: opacity .35s; z-index: 4; }
+.dim.on { opacity: 1; }
+.panel { position: absolute; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 24px 24px 0 0; padding: 18px 16px 30px; z-index: 5;
+  transform: translateY(105%); transition: transform .4s cubic-bezier(.2,.7,.2,1); }
+.panel.open { transform: none; }
+.panel h3 { font-size: 17px; margin: 0 0 12px; display: flex; justify-content: space-between; }
+.panel h3 em { font-style: normal; display: flex; align-items: center; gap: 12px; }
+.panel h3 em > span:last-child { color: var(--muted); font-weight: 400; }
+.panel h3 .chipx { font-size: 11px; }
+.field { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; font-size: 12.5px; min-height: 32px; margin-bottom: 8px; box-sizing: border-box; }
+.field.ph { color: var(--muted); }
+.field.tall { min-height: 50px; }
+.prow { display: flex; justify-content: space-between; font-size: 12.5px; margin: 6px 0 10px; }
+.prow b { color: var(--accent); }
+.btn { background: var(--accent); color: var(--bg); text-align: center; font-weight: 700; font-size: 13.5px; border-radius: 11px; padding: 11px; margin-top: 6px; }
+
+/* the finger and the mouse */
+.tap { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 2px solid #fff9; background: #ffffff22; opacity: 0; pointer-events: none; z-index: 9; transition: left .45s ease, top .45s ease, opacity .25s; }
+.tap.show { opacity: 1; }
+.tap.press { transform: scale(.7); background: #ffffff55; transition: left .45s ease, top .45s ease, opacity .25s, transform .12s; }
+.tap.drag { transition: opacity .25s; }
+.pointer { position: absolute; width: 30px; height: 30px; z-index: 6; transition: left .5s ease, top .5s ease, transform .12s; transform-origin: 3px 2px; }
+.pointer.press { transform: scale(.82); }
+
+/* desktop browser and the user's Google Sheet */
+.browser { position: absolute; border-radius: 12px; overflow: hidden; background: var(--bg); box-shadow: 0 30px 80px #0009, 0 0 0 1px #2c3150; }
+.chrome { height: 34px; background: #151829; display: flex; align-items: center; gap: 7px; padding: 0 12px; }
+.chrome i { width: 10px; height: 10px; border-radius: 50%; background: #2d3254; }
+.chrome span { margin-left: 10px; flex: 1; height: 20px; border-radius: 6px; background: #0e1120; color: var(--muted); font-size: 11px; display: flex; align-items: center; padding: 0 10px; }
+.web { display: flex; height: calc(100% - 34px); }
+.rail { width: 64px; background: var(--card); border-right: 1px solid var(--line); display: grid; align-content: start; gap: 14px; padding-top: 16px; justify-items: center; font-size: 9.5px; color: var(--muted); }
+.rail div { display: grid; justify-items: center; gap: 2px; }
+.rail .cur { color: var(--text); }
+.rail b { font-size: 15px; font-weight: 400; }
+.cats { width: 128px; padding: 12px 8px; display: grid; align-content: start; gap: 2px; font-size: 11px; }
+.cats div { display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 8px; border-left: 2px solid transparent; }
+.cats div span { color: var(--muted); }
+.cats .cur { background: var(--chip); border-left-color: var(--accent); font-weight: 700; }
+.cats .up { color: var(--warm); }
+.pane { flex: 1; padding: 12px 14px; min-width: 0; }
+.pane .irow { margin-bottom: 6px; padding: 7px 9px 7px 11px; }
+.pane .irow .t { font-size: 12.5px; }
+.gsheet { position: absolute; width: 380px; border-radius: 12px; overflow: hidden; background: #fff; color: #222; box-shadow: 0 24px 60px #0008; font-size: 11.5px; }
+.gsheet .hd { background: #f1f3f4; padding: 9px 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #dadce0; }
+.gsheet .hd i { width: 14px; height: 18px; border-radius: 2px; background: #2e9e5b; display: inline-block; }
+.gsheet table { border-collapse: collapse; width: 100%; }
+.gsheet th, .gsheet td { border: 1px solid #e0e0e0; padding: 5px 7px; text-align: left; white-space: nowrap; }
+.gsheet th { background: #c9cdf5; }
+.gsheet tr.new td { transition: opacity .5s, box-shadow .4s; }
+.gsheet tr.new.hide td { opacity: 0; }
+.gsheet tr.new.flash td { box-shadow: inset 0 0 0 999px #1a73e822; }
+.gsheet .tabsrow { display: flex; gap: 2px; background: #f1f3f4; border-top: 1px solid #dadce0; padding: 0 8px; font-size: 11px; }
+.gsheet .tabsrow span { padding: 6px 10px; color: #555; }
+.gsheet .tabsrow .cur { background: #fff; color: #1a73e8; font-weight: 700; border-bottom: 2px solid #1a73e8; }
+.packet { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 22px var(--green); opacity: 0; z-index: 6; }
+.flow { position: absolute; font: 600 15px var(--ui); color: var(--muted); text-align: center; }
+.note-band { position: absolute; left: 0; right: 0; bottom: 34px; margin: 0; text-align: center; }
+.note-band span { display: inline-block; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 12px 26px; font-size: 18px; color: var(--muted); }
+.note-band b { color: var(--green); font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene, .irow, .chipx, .tap, .panel, .dim, .toast, .queue .irow, tr.new td { transition: none !important; }
+  .caret { animation: none; }
+}
+</style>
+
+<!-- The app icon: a speech bubble (someone telling you about something) with a star in it. -->
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="logo" viewBox="0 0 120 120">
+    <rect x="14" y="20" width="92" height="66" rx="22" fill="#9fa8ff"/>
+    <path d="M34 78h22L28 104z" fill="#9fa8ff"/>
+    <polygon points="60.0,31.0 65.1,45.0 80.0,45.5 68.2,54.7 72.3,69.0 60.0,60.6 47.7,69.0 51.8,54.7 40.0,45.5 54.9,45.0" fill="#ffc47a"/>
+  </symbol>
+</svg>
+
+<div class="wrap">
+  <div class="viewport" id="viewport">
+    <div class="stage" id="stage">
+
+      <!-- Always in the corner (except on the title and end cards). -->
+      <div class="brand" id="brand">
+        <svg aria-hidden="true"><use href="#logo"/></svg>
+        <strong>Recommendation Journal</strong><span>Open Source</span>
+      </div>
+
+      <!-- 0. Title card (2 seconds) -->
+      <section class="scene" id="s-title" aria-label="Title">
+        <div class="center">
+          <svg class="mark" aria-hidden="true"><use href="#logo"/></svg>
+          <h1 class="title">Recommendation Journal</h1>
+          <p class="sub">Remember what people recommend to you, who told you, and why.</p>
+          <span class="pill">Free &amp; Open Source</span>
+        </div>
+      </section>
+
+      <!-- 1. Add -->
+      <section class="scene" id="s-add" aria-label="Add a recommendation">
+        <div class="caption">
+          <div class="eyebrow">Add</div>
+          <h2>Someone recommends something?</h2>
+          <p>Type the title and press Enter.</p>
+          <p>Note who told you and why, so you remember it later.</p>
+        </div>
+        <div class="phone" style="left: 760px; top: 40px">
+          <div class="screen">
+            <div class="notch"></div>
+            <div class="app">
+              <div class="apptitle">Recommendations</div>
+              <div class="search"><span>⌕</span><span id="a-q"></span><span class="x" id="a-x"></span></div>
+              <div class="pick"><span>Category</span><b>All</b><span id="a-count">3</span><span>▾</span></div>
+              <div class="addbar" id="a-addbar">+ Add “Qoosh” to Flash game</div>
+              <div class="irow gone" id="a-new">
+                <div class="t">Qoosh</div>
+                <div class="m">Flash game · Want to play · from my brother</div>
+                <div class="n">My brother plays it on his lunch break</div>
+              </div>
+              <div id="a-list">
+                <div class="irow"><div class="t"><i>★ 1 </i> Citizen Kane</div><div class="m">by Orson Welles · Movie · Want to watch · from my film teacher</div></div>
+                <div class="irow done"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movie · Watched · from Dad</div><span class="r">❤️</span></div>
+                <div class="irow"><div class="t">The Count of Monte Cristo</div><div class="m">by Alexandre Dumas · Fiction book · Want to read</div></div>
+              </div>
+            </div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="toast" id="a-toast">Added “Qoosh”.<b>Undo</b></div>
+            <div class="dim" id="a-dim"></div>
+            <div class="panel" id="a-panel">
+              <h3>Add a game <em><span class="chipx w">☆ Up next</span><span>×</span></em></h3>
+              <div class="field">Qoosh</div>
+              <div class="chips"><span class="chipx">Movie</span><span class="chipx">Fiction book</span><span class="chipx sel">Flash game</span><span class="chipx">+ New category</span></div>
+              <div class="field" id="a-by"></div>
+              <div class="field tall" id="a-why"></div>
+              <div class="chips"><span class="chipx w sel">Want to play</span><span class="chipx g">Played</span></div>
+              <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
+              <div class="btn" id="a-save">Add</div>
+            </div>
+            <div class="tap" id="a-tap"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Search -->
+      <section class="scene" id="s-search" aria-label="Search">
+        <div class="caption">
+          <div class="eyebrow">Search</div>
+          <h2>Already on your list?</h2>
+          <p>The same box searches as you type: titles, authors, who told you, and why.</p>
+        </div>
+        <div class="phone" style="left: 760px; top: 40px">
+          <div class="screen">
+            <div class="notch"></div>
+            <div class="app">
+              <div class="apptitle">Recommendations</div>
+              <div class="search"><span>⌕</span><span id="q-q"></span><span class="x" id="q-x"></span></div>
+              <div class="pick"><span>Category</span><b>All</b><span>6</span><span>▾</span></div>
+              <div class="addbar" id="q-addbar">+ Add “king” to Fiction book</div>
+              <div class="irow" data-match="0"><div class="t">Qoosh</div><div class="m">Flash game · Want to play · from my brother</div></div>
+              <div class="irow" data-match="1"><div class="t">The Mist</div><div class="m">by Stephen King · Fiction book · Want to read · from Sam</div><div class="n">Short and scary, read it in one sitting</div></div>
+              <div class="irow" data-match="0"><div class="t">Titanic</div><div class="m">by James Cameron · Movie · Want to watch · from a stranger on the train</div></div>
+              <div class="irow done" data-match="1"><div class="t">It</div><div class="m">by Stephen King · Fiction book · Read · from my sister</div><span class="r">👍</span></div>
+              <div class="irow" data-match="0"><div class="t">Citizen Kane</div><div class="m">by Orson Welles · Movie · Want to watch</div></div>
+              <div class="irow done" data-match="0"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movie · Watched</div><span class="r">❤️</span></div>
+            </div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tap" id="q-tap"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Up next -->
+      <section class="scene" id="s-upnext" aria-label="Up next">
+        <div class="caption">
+          <div class="eyebrow" style="color: var(--warm)">Up next</div>
+          <h2>Pick what's next.</h2>
+          <p>Star what you want to get to soon, and drag it into order.</p>
+          <p><q id="u-quote">Watch Titanic this weekend.</q></p>
+        </div>
+        <div class="phone" style="left: 760px; top: 40px">
+          <div class="screen">
+            <div class="notch"></div>
+            <div class="app">
+              <div class="apptitle">Recommendations</div>
+              <div class="search"><span>⌕</span><span class="ph">Search, or type something new to add…</span></div>
+              <div class="pick"><span>Category</span><b style="color: var(--warm)">★ Up next</b><span>3</span><span>▾</span></div>
+              <div class="muted">What you want to get to soon. Drag ≡ to change the order; done things leave the list.</div>
+              <div class="queue" id="u-queue">
+                <div class="irow" data-key="kane"><div class="t"><i class="rank"></i>Citizen Kane</div><div class="m">by Orson Welles · Movie · from my film teacher</div><span class="grip">≡</span></div>
+                <div class="irow" data-key="mist"><div class="t"><i class="rank"></i>The Mist</div><div class="m">by Stephen King · Fiction book · from Sam</div><span class="grip">≡</span></div>
+                <div class="irow" data-key="pre"><div class="t"><i class="rank"></i>Titanic</div><div class="m">Movie · from a stranger on the train</div><div class="n" id="u-note"></div><span class="grip">≡</span></div>
+              </div>
+            </div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tap" id="u-tap"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Done -->
+      <section class="scene" id="s-done" aria-label="Mark it done and rate it">
+        <div class="caption">
+          <div class="eyebrow" style="color: var(--green)">Done</div>
+          <h2>Watched it? Rate it.</h2>
+          <p>❌ bad, ✅ average, 👍 great, ❤️ exceptional.</p>
+          <p>It leaves Up next by itself.</p>
+        </div>
+        <div class="phone" style="left: 760px; top: 40px">
+          <div class="screen">
+            <div class="notch"></div>
+            <div class="app">
+              <div class="apptitle">Recommendations</div>
+              <div class="search"><span>⌕</span><span class="ph">Search, or add a movie…</span></div>
+              <div class="pick"><span>Category</span><b>Movie</b><span>3</span><span>▾</span></div>
+              <div class="irow" id="d-row"><div class="t"><i id="d-rank">★ 1 </i>Titanic</div><div class="m" id="d-meta">Movie · Want to watch · from a stranger on the train</div><div class="n">Watch this weekend 🍿</div><span class="r" id="d-heart"></span></div>
+              <div class="irow"><div class="t"><i>★ 2 </i>Citizen Kane</div><div class="m">by Orson Welles · Movie · Want to watch</div></div>
+              <div class="irow done"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movie · Watched</div><span class="r">❤️</span></div>
+            </div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="dim" id="d-dim"></div>
+            <div class="panel" id="d-panel">
+              <h3>Edit <em><span class="chipx w" id="d-up">★ Up next #1</span><span>×</span></em></h3>
+              <div class="field">Titanic</div>
+              <div class="field">a stranger on the train</div>
+              <div class="field">Watch this weekend 🍿</div>
+              <div class="chips"><span class="chipx w" id="d-want">Want to watch</span><span class="chipx g" id="d-watched">Watched</span></div>
+              <div class="chips">
+                <span class="chipx">❌ Bad</span><span class="chipx">✅ Average</span><span class="chipx">👍 Great</span><span class="chipx sel" id="d-love" style="background: var(--chip); border-color: var(--line); color: var(--text); font-weight: 400">❤️ Exceptional</span>
+              </div>
+              <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
+              <div class="prow" id="d-on" style="visibility: hidden">Watched on <b>Oct 25, 2026</b></div>
+              <div class="btn" id="d-save">Save</div>
+            </div>
+            <div class="tap" id="d-tap"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Phone, browser and your Google Sheet -->
+      <section class="scene" id="s-sync" aria-label="Phone, browser and your Google Sheet">
+        <div style="position: absolute; left: 96px; right: 96px; top: 30px; text-align: center">
+          <div class="eyebrow" style="color: var(--warm)">Everywhere</div>
+          <h2 style="font: 800 42px/1.1 var(--display); margin: 0" id="y-h">On your phone, in your browser, and in your own Google Sheet.</h2>
+        </div>
+        <div class="phone" style="left: 70px; top: 165px; transform: scale(.56); transform-origin: 0 0">
+          <div class="screen">
+            <div class="notch"></div>
+            <div class="app">
+              <div class="apptitle">Recommendations</div>
+              <div class="chips" style="justify-content: flex-end"><span class="chipx" id="y-sync">⟳ Sync</span></div>
+              <div class="irow gone" id="y-ph-new"><div class="t">Bloons Tower Defense</div><div class="m">Flash game · Want to play · from Sam</div></div>
+              <div class="irow"><div class="t">Qoosh</div><div class="m">Flash game · Want to play · from my brother</div></div>
+              <div class="irow done"><div class="t">Titanic</div><div class="m">Movie · Watched · from a stranger on the train</div><span class="r">❤️</span></div>
+              <div class="irow"><div class="t">The Mist</div><div class="m">by Stephen King · Fiction book</div></div>
+            </div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tap" id="y-tap"></div>
+          </div>
+        </div>
+
+        <div class="gsheet" style="left: 300px; top: 250px" id="y-gs">
+          <div class="hd"><i></i>My recommendations</div>
+          <table>
+            <tr><th>Title</th><th>Status</th><th>Recommended by</th></tr>
+            <tr><td>Line Rider</td><td>Played</td><td>a forum</td></tr>
+            <tr><td>Fancy Pants</td><td>Want to play</td><td>Sam</td></tr>
+            <tr class="new hide" id="y-gs-new"><td>Qoosh</td><td>Want to play</td><td>my brother</td></tr>
+            <tr class="new hide" id="y-gs-new2"><td>Bloons Tower Defense</td><td>Want to play</td><td>Sam</td></tr>
+          </table>
+          <div class="tabsrow"><span>Movie</span><span>Fiction book</span><span class="cur">Flash game</span><span>Categories</span></div>
+        </div>
+
+        <div class="browser" style="left: 710px; top: 175px; width: 520px; height: 360px">
+          <div class="chrome"><i></i><i></i><i></i><span>recommendation-journal.expo.app</span></div>
+          <div class="web">
+            <div class="rail"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="cats">
+              <div class="up">★ Up next <span>2</span></div><div>All <span id="y-all">8</span></div><div>Movie <span>3</span></div><div>Fiction book <span>2</span></div><div class="cur">Flash game <span id="y-fg">2</span></div>
+            </div>
+            <div class="pane">
+              <div class="search" style="height: 32px; font-size: 11.5px; margin-bottom: 6px"><span>⌕</span><span id="y-web-q"></span></div>
+              <div class="addbar" id="y-web-add" style="padding: 7px 10px; font-size: 11px; margin-bottom: 6px">+ Add “Bloons Tower Defense” to Flash game</div>
+              <div class="irow gone" id="y-web-new2"><div class="t">Bloons Tower Defense</div><div class="m">Want to play · from Sam</div></div>
+              <div class="irow gone" id="y-web-new"><div class="t">Qoosh</div><div class="m">Want to play · from my brother</div></div>
+              <div class="irow"><div class="t">Fancy Pants</div><div class="m">Want to play · from Sam</div></div>
+              <div class="irow done"><div class="t">Line Rider</div><div class="m">Played · from a forum</div><span class="r">👍</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="flow" style="left: 70px; top: 540px; width: 190px">Phone</div>
+        <div class="flow" style="left: 300px; top: 450px; width: 380px">Your Google Sheet · one tab per category</div>
+        <div class="flow" style="left: 710px; top: 548px; width: 520px">Any browser</div>
+        <div class="packet" id="y-packet"></div>
+        <div class="packet" id="y-packet2" style="background: var(--accent); box-shadow: 0 0 22px var(--accent)"></div>
+        <svg class="pointer" id="y-ptr" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2l15 11-6.5 1.2L15 21l-3 1.4-3.5-6.8L3 20z" fill="#fff" stroke="#0e1120" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <p class="note-band">
+          <span><b>Private to you.</b> Stored on your device. No account, no Google sign-in inside the app. Edit the sheet and it syncs back.</span>
+        </p>
+      </section>
+
+      <!-- 6. End card -->
+      <section class="scene" id="s-end" aria-label="End">
+        <div class="center">
+          <svg class="mark" aria-hidden="true"><use href="#logo"/></svg>
+          <h1 class="title" style="font-size: 76px">Recommendation Journal</h1>
+          <span class="pill">Free &amp; Open Source · No account · No ads · No tracking</span>
+          <div class="links">
+            <div><span>Try it:</span> recommendation-journal.expo.app</div>
+            <div><span>Code:</span> github.com/AlexisDrain/Recommendation-Journal</div>
+          </div>
+        </div>
+        <!-- The music's licence (CC BY 4.0) requires this credit. -->
+        <p class="credit">
+          Music: "Inspired" Kevin MacLeod (incompetech.com)<br>
+          Licensed under Creative Commons: By Attribution 4.0 License<br>
+          http://creativecommons.org/licenses/by/4.0/
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="play" type="button">Pause</button>
+    <button id="restart" type="button">Restart</button>
+    <button id="sound" type="button" aria-pressed="false">Sound: off</button>
+    <audio id="music" src="Inspired.mp3" preload="auto"></audio>
+    <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+    <span class="tip" id="clock">0:00 / 0:56</span>
+  </div>
+  <p class="tip">To turn this into a video file: press Sound so it says on, make the window full screen, press Restart, and record it with Xbox Game Bar (Win + Alt + R), which records the sound too.</p>
+</div>
+
+<script>
+(() => {
+  const SPLASH = 2.5;                              // the title card, before everything else
+  const BODY = 54;                               // the scenes after it
+  const LENGTH = SPLASH + BODY;                    // seconds, then it loops
+  const SCENES = [['s-add', 0, 12], ['s-search', 12, 19.5], ['s-upnext', 19.5, 28.5], ['s-done', 28.5, 36], ['s-sync', 36, 48.5], ['s-end', 48.5, BODY]];
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), viewport = $('viewport');
+
+  // Scale the 1280×720 stage to the window.
+  const fit = () => { stage.style.transform = `scale(${viewport.clientWidth / 1280})`; };
+  new ResizeObserver(fit).observe(viewport);
+  fit();
+
+  // Everything on screen is a pure function of the time, so pause and restart are exact.
+  const after = (t, at) => t >= at;
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const typed = (text, t, from, to) => [...text].slice(0, Math.round(clamp((t - from) / (to - from)) * [...text].length)).join('');
+  /** Text being typed into a box, with a blinking caret while typing. Empty: the placeholder. */
+  const typeInto = (el, text, t, from, to, placeholder) => {
+    const shown = typed(text, t, from, to);
+    el.innerHTML = '';
+    if (shown) el.append(shown);
+    else if (placeholder) { const p = document.createElement('span'); p.className = 'ph'; p.style.color = 'var(--muted)'; p.textContent = placeholder; el.append(p); }
+    if (t >= from - 0.2 && t < to + 0.4) { const c = document.createElement('span'); c.className = 'caret'; el.append(c); }
+  };
+  /**
+   * The finger: for each [time, element], it moves onto the element a moment before `time`,
+   * presses at `time` and lifts off. Positions are measured from the real elements.
+   */
+  const place = (dot, el, dx = 0, dy = 0) => {
+    const scale = viewport.clientWidth / 1280;
+    const box = dot.parentElement.getBoundingClientRect(), r = el.getBoundingClientRect();
+    const inner = dot.parentElement.offsetWidth / (box.width / scale); // the sync scene's phone is drawn smaller
+    dot.style.left = ((r.left + r.width / 2 - box.left) / scale) * inner + dx + 'px';
+    dot.style.top = ((r.top + r.height / 2 - box.top) / scale) * inner + dy + 'px';
+  };
+  const tapAt = (tap, t, moves) => {
+    const m = moves.find(([at]) => t >= at - 0.6 && t < at + 0.3);
+    tap.classList.toggle('show', !!m);
+    tap.classList.toggle('press', !!m && t >= m[0] - 0.08 && t < m[0] + 0.15);
+    if (m) place(tap, m[1]);
+  };
+
+  /** The mouse pointer: always visible in its scene, gliding to each target and clicking at its time. */
+  const pointerAt = (ptr, t, moves) => {
+    const m = [...moves].reverse().find(([at]) => t >= at - 0.6) ?? moves[0];
+    ptr.classList.toggle('press', t >= m[0] - 0.08 && t < m[0] + 0.15);
+    const scale = viewport.clientWidth / 1280;
+    const box = ptr.parentElement.getBoundingClientRect(), r = m[1].getBoundingClientRect();
+    ptr.style.left = (r.left + r.width / 2 - box.left) / scale - 3 + 'px';
+    ptr.style.top = (r.top + r.height / 2 - box.top) / scale - 2 + 'px';
+  };
+
+  /** One moment of the video: the title card, then the scenes on their own clock (t − SPLASH). */
+  function frame(t) {
+    scenes(t - SPLASH);
+    $('s-title').classList.toggle('on', t < SPLASH);
+    $('prog').style.width = (t / LENGTH * 100) + '%';
+    const s = (x) => `${(x / 60) | 0}:${String((x % 60) | 0).padStart(2, '0')}`;
+    $('clock').textContent = `${s(t)} / ${s(LENGTH)}`;
+  }
+
+  function scenes(t) {
+    for (const [id, a, b] of SCENES) $(id).classList.toggle('on', t >= a && t < b);
+    $('brand').style.opacity = t >= 0 && t < 48.5 ? 1 : 0;
+
+    // ---- 1. Add: type "Qoosh", tap Add, fill in who and why, Add.
+    const addOpen = t >= 2.8 && t < 7.6;
+    const added = t >= 7.6;
+    typeInto($('a-q'), added ? '' : 'Qoosh', t, 0.8, 1.9, 'Search, or type something new to add…');
+    $('a-x').textContent = !added && t >= 0.9 ? '×' : '';
+    $('a-addbar').style.display = !added && t >= 1.9 ? 'block' : 'none';
+    $('a-panel').classList.toggle('open', addOpen);
+    $('a-dim').classList.toggle('on', addOpen);
+    typeInto($('a-by'), 'my brother', t, 3.6, 4.6, 'Who recommended it? (my brother, a stranger in the park…)');
+    typeInto($('a-why'), 'My brother plays it on his lunch break', t, 5.0, 6.9, 'Why? What did they say about it?');
+    $('a-new').classList.toggle('gone', !added);
+    $('a-new').classList.toggle('flash', t >= 7.8 && t < 9);
+    $('a-count').textContent = added ? '4' : '3';
+    $('a-toast').classList.toggle('on', t >= 7.9 && t < 11);
+    tapAt($('a-tap'), t, [[1.0, $('a-q')], [2.6, $('a-addbar')], [3.5, $('a-by')], [4.9, $('a-why')], [7.4, $('a-save')]]);
+
+    // ---- 2. Search: "king" narrows the list to Stephen King, then the search is cleared.
+    const q = t - 12;
+    const query = q < 5.6 ? typed('king', q, 1.0, 1.9) : '';
+    typeInto($('q-q'), query, q < 5.6 ? q : -9, 1.0, 1.9, 'Search, or type something new to add…');
+    $('q-x').textContent = query ? '×' : '';
+    $('q-addbar').style.display = query.length === 4 ? 'block' : 'none';
+    for (const row of document.querySelectorAll('#s-search .irow')) row.classList.toggle('gone', query.length >= 2 && row.dataset.match === '0');
+    tapAt($('q-tap'), q, [[1.0, $('q-q')], [5.6, $('q-x')]]);
+
+    // ---- 3. Up next: drag Titanic from third to first, then give it a note.
+    const u = t - 19.5;
+    const SLOT = 92;
+    const dragFrom = 1.6, dragTo = 3.1;
+    const k = clamp((u - dragFrom) / (dragTo - dragFrom));
+    const eased = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+    const dropped = u >= dragTo;
+    const dragY = lerp(2 * SLOT, 0, eased);
+    const order = dropped ? ['pre', 'kane', 'mist'] : ['kane', 'mist', 'pre'];
+    for (const row of document.querySelectorAll('#u-queue .irow')) {
+      const key = row.dataset.key;
+      let y;
+      if (key === 'pre' && !dropped) y = dragY;
+      else if (!dropped && u >= dragFrom) {
+        const i = order.indexOf(key); // kane 0, mist 1: each steps down once the dragged row passes it
+        y = (dragY < (i + 0.5) * SLOT ? i + 1 : i) * SLOT;
+      } else y = order.indexOf(key) * SLOT;
+      row.style.top = y + 'px';
+      row.classList.toggle('lift', key === 'pre' && u >= dragFrom - 0.2 && u < dragTo + 0.1);
+      row.querySelector('.rank').textContent = `★ ${order.indexOf(key) + 1}  `;
+    }
+    typeInto($('u-note'), 'Watch this weekend 🍿', u, 4.6, 6.2);
+    const grip = document.querySelector('#u-queue [data-key="pre"] .grip');
+    const uTap = $('u-tap');
+    if (u >= dragFrom - 0.6 && u < dragTo + 0.4) {
+      uTap.classList.add('show');
+      uTap.classList.toggle('drag', u >= dragFrom && u < dragTo);
+      uTap.classList.toggle('press', u >= dragFrom - 0.1 && u < dragTo);
+      place(uTap, grip);
+    } else {
+      uTap.classList.remove('drag');
+      tapAt(uTap, u, [[4.3, $('u-note').closest('.irow')]]);
+    }
+
+    // ---- 4. Done: open it, tap Watched, ❤️, Save. It turns green and leaves Up next.
+    const d = t - 28.5;
+    const editing = d >= 0.6 && d < 4.4;
+    const watched = d >= 1.6, loved = d >= 2.5, saved = d >= 4.4;
+    $('d-panel').classList.toggle('open', editing);
+    $('d-dim').classList.toggle('on', editing);
+    $('d-want').classList.toggle('sel', !watched);
+    $('d-up').classList.toggle('sel', !watched);
+    $('d-up').style.display = watched ? 'none' : '';
+    $('d-watched').classList.toggle('sel', watched);
+    $('d-on').style.visibility = watched ? 'visible' : 'hidden';
+    const love = $('d-love');
+    love.style.cssText = loved ? 'background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700' : 'background: var(--chip); border-color: var(--line); color: var(--text); font-weight: 400';
+    $('d-row').classList.toggle('done', saved);
+    $('d-row').classList.toggle('flash', d >= 4.5 && d < 5.6);
+    $('d-rank').textContent = saved ? '' : '★ 1 ';
+    $('d-meta').textContent = saved ? 'Movie · Watched Oct 25, 2026 · from a stranger on the train' : 'Movie · Want to watch · from a stranger on the train';
+    $('d-heart').textContent = saved ? '❤️' : '';
+    tapAt($('d-tap'), d, [[0.5, $('d-row')], [1.6, $('d-watched')], [2.5, love], [4.2, $('d-save')]]);
+
+    // ---- 5. Sync: from the phone to the sheet's Flash game tab, then to the browser.
+    const y = t - 36;
+    const syncing = y >= 1.2 && y < 4.8, synced = y >= 4.8;
+    $('y-sync').textContent = synced ? 'Synced ✓' : syncing ? 'Syncing…' : '⟳ Sync';
+    $('y-sync').classList.toggle('sel', syncing);
+    tapAt($('y-tap'), y, [[1.2, $('y-sync')]]);
+    let pk = null;
+    if (y >= 1.5 && y < 2.6) { const k2 = (y - 1.5) / 1.1; pk = [lerp(255, 310, k2), lerp(300, 300 - 60 * Math.sin(Math.PI * k2), k2)]; }
+    if (y >= 3.4 && y < 4.5) { const k2 = (y - 3.4) / 1.1; pk = [lerp(680, 760, k2), lerp(320, 320 - 60 * Math.sin(Math.PI * k2), k2)]; }
+    $('y-packet').style.opacity = pk ? 1 : 0;
+    if (pk) { $('y-packet').style.left = pk[0] + 'px'; $('y-packet').style.top = pk[1] + 'px'; }
+    $('y-gs-new').classList.toggle('hide', y < 2.6);
+    $('y-gs-new').classList.toggle('flash', y >= 2.6 && y < 3.7);
+    $('y-web-new').classList.toggle('gone', y < 4.5);
+    $('y-web-new').classList.toggle('flash', y >= 4.5 && y < 5.6);
+    // ...and back: the computer adds one, it goes to the sheet, then to the phone.
+    const webAdded = y >= 7.9;
+    typeInto($('y-web-q'), webAdded ? '' : 'Bloons Tower Defense', y >= 6.2 ? y : -9, 6.4, 7.3, 'Search, or add a game…');
+    $('y-web-add').style.display = !webAdded && y >= 7.3 ? 'block' : 'none';
+    $('y-web-new2').classList.toggle('gone', !webAdded);
+    $('y-web-new2').classList.toggle('flash', y >= 7.9 && y < 9);
+    let back = null;
+    if (y >= 8.3 && y < 9.4) { const k2 = (y - 8.3) / 1.1; back = [lerp(760, 680, k2), lerp(360, 360 + 60 * Math.sin(Math.PI * k2), k2)]; }
+    if (y >= 10.0 && y < 11.1) { const k2 = (y - 10.0) / 1.1; back = [lerp(310, 255, k2), lerp(360, 360 + 60 * Math.sin(Math.PI * k2), k2)]; }
+    $('y-packet2').style.opacity = back ? 1 : 0;
+    if (back) { $('y-packet2').style.left = back[0] + 'px'; $('y-packet2').style.top = back[1] + 'px'; }
+    $('y-gs-new2').classList.toggle('hide', y < 9.4);
+    $('y-gs-new2').classList.toggle('flash', y >= 9.4 && y < 10.5);
+    $('y-ph-new').classList.toggle('gone', y < 11.1);
+    $('y-ph-new').classList.toggle('flash', y >= 11.1 && y < 12.2);
+    pointerAt($('y-ptr'), y, [[0, $('y-web-q')], [6.2, $('y-web-q')], [7.7, $('y-web-add')]]);
+    $('y-ptr').style.opacity = y >= 5.4 ? 1 : 0;
+    $('y-h').textContent = y < 5.8 ? 'On your phone, in your browser, and in your own Google Sheet.' : 'Add it anywhere. It reaches the others.';
+    $('y-all').textContent = y >= 7.9 ? '10' : y >= 4.5 ? '9' : '8';
+    $('y-fg').textContent = y >= 7.9 ? '4' : y >= 4.5 ? '3' : '2';
+  }
+
+  let elapsed = 0, last = performance.now(), playing = true;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function loop(now) {
+    if (playing) elapsed = (elapsed + (now - last) / 1000) % LENGTH;
+    last = now;
+    frame(elapsed);
+    requestAnimationFrame(loop);
+  }
+  $('play').addEventListener('click', () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; });
+  $('restart').addEventListener('click', () => { elapsed = 0; playing = true; $('play').textContent = 'Pause'; });
+
+  // The song plays from the trailer's own position, fades in at the start and out over the last 2 seconds,
+  // and starts again when the trailer loops.
+  const music = $('music');
+  let sound = false;
+  $('sound').addEventListener('click', () => {
+    sound = !sound;
+    $('sound').textContent = sound ? 'Sound: on' : 'Sound: off';
+    $('sound').setAttribute('aria-pressed', String(sound));
+    if (!sound) music.pause();
+  });
+  setInterval(() => {
+    if (!sound || !playing) { if (!music.paused) music.pause(); return; }
+    if (Math.abs(music.currentTime - elapsed) > 0.25) music.currentTime = elapsed;
+    music.volume = Math.max(0, Math.min(1, elapsed / 0.5, (LENGTH - elapsed) / 2));
+    if (music.paused) music.play().catch(() => {});
+  }, 100);
+  // Lets a page that embeds the trailer (or a test) show one exact moment: ?t=12.5 opens paused there.
+  const at = Number(new URLSearchParams(location.search).get('t'));
+  if (at >= 0 && location.search.includes('t=')) { playing = false; elapsed = Math.min(at, LENGTH - 0.01); $('play').textContent = 'Play'; }
+  else if (reduce) { playing = false; elapsed = SPLASH + 11; $('play').textContent = 'Play'; } // start on a still, filled-in list
+  frame(elapsed);
+  requestAnimationFrame(loop);
+})();
+</script>

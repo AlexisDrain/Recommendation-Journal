@@ -152,7 +152,7 @@ export async function importTables(tables: { name: string; rows: string[][] }[],
         // A backup's own ids are kept, so restoring it doesn't duplicate rows in the Google Sheet.
         const uid = /^[\w-]{6,64}$/.test(id) ? id : newUid();
         uids.add(uid);
-        await writeItem(tx, { uid, categoryUid: category.uid, deleted: false, updatedAt: now, ...fields, author: fields.author ?? '' });
+        await writeItem(tx, { uid, categoryUid: category.uid, deleted: false, updatedAt: now, ...fields, author: fields.author ?? '', queuePos: fields.queuePos ?? null });
         result.added++;
       }
     }
