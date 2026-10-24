@@ -54,11 +54,15 @@ async function siteIsLive(expected) {
     fs.rmSync(path.join(app, 'dist'), { recursive: true, force: true });
     run('npx expo export --platform web');
     const expected = entryOf(fs.readFileSync(path.join(app, 'dist', 'index.html'), 'utf8'));
-    run('npx eas-cli@latest deploy --prod --non-interactive');
-    // A deploy has once reported success while the site kept the previous build: check, and upload once more if so.
+    const deployed = execSync('npx eas-cli@latest deploy --prod --non-interactive', { cwd: app, encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] });
+    process.stdout.write(deployed);
+    // A deploy has reported success while the site kept the previous build (the upload was fine,
+    // but the main address still pointed at the old one): check, and point it at the new one if so.
     if (!(await siteIsLive(expected))) {
-      console.log('\nThe website still shows the previous build. Uploading again…\n');
-      run('npx eas-cli@latest deploy --prod --non-interactive');
+      const id = deployed.match(/https:\/\/[a-z0-9-]+--([a-z0-9]+)\.expo\.app/)?.[1];
+      console.log('\nThe website still shows the previous build. Pointing it at the new one…\n');
+      if (id) run(`npx eas-cli@latest deploy:alias --prod --id ${id} --non-interactive`);
+      else run('npx eas-cli@latest deploy --prod --non-interactive');
       webOk = await siteIsLive(expected);
     }
     console.log(webOk ? `\nChecked: ${site} serves build ${info.build}.` : `\nWARNING: ${site} still doesn't serve build ${info.build}.`);

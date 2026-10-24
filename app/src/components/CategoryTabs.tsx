@@ -48,7 +48,7 @@ export function CategoryTabs({ categories, counts, selected, onSelect, onNew, pl
   );
 }
 
-/** Phones: "Category: Movie ▾", which opens the same list of tabs. */
+/** Phones: "Category: Movies ▾", which opens the same list of tabs. */
 export function CategoryPicker(props: Props) {
   const [open, setOpen] = useState(false);
   const current = props.categories.find((c) => c.uid === props.selected);

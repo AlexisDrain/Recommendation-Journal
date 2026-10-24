@@ -14,7 +14,7 @@
  * never needs your Google login and the sheet never has to be shared.
  *
  * What it does with your sheet:
- *   - one tab per category ("Movie", "Fiction book", "Flash game"…), in the app's order; renaming,
+ *   - one tab per category ("Movies", "Fiction books", "Flash games"…), in the app's order; renaming,
  *     hiding or deleting a category in the app does the same to its tab
  *   - a "Categories" tab with the list of categories and their words ("Want to watch" / "Watched")
  *   - adds new recommendations and updates changed ones; the newest version wins (the "Updated" column)

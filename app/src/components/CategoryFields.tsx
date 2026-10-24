@@ -1,5 +1,5 @@
 // The fields of a category: its name, and the words used for its items. While you type a new
-// name, the words are guessed for you ("Flash game" → game / Want to play / Played) until you
+// name, the words are guessed for you ("Flash games" → game / Want to play / Played) until you
 // change one of them yourself.
 import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
@@ -44,7 +44,7 @@ export function CategoryFields({ value, onChange, autoFocus, ideas, onSubmit }: 
 
   return (
     <View style={{ gap: space.sm }}>
-      <Input placeholder="Category name, like “Flash game”" value={value.name} onChangeText={setName}
+      <Input placeholder="Category name, like “Flash games”" value={value.name} onChangeText={setName}
         autoFocus={autoFocus} returnKeyType="done" onSubmitEditing={onSubmit} accessibilityLabel="Category name" />
       {ideas && !value.name && (
         <View style={styles.chips}>

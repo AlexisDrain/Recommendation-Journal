@@ -1,32 +1,31 @@
 // The Sheet tab's table, on phones. (Web: SheetTable.web.tsx, a plain HTML table.)
 //
 // The Title column stays put while the rest scrolls sideways, and round edge arrows show (and jump
-// to) the columns that are off screen, so it's clear there is more to the right. The rows scroll
-// up and down inside the sideways scroller; with touch, each swipe goes to the right one.
+// to) the columns that are off screen, so it's clear there is more to the right. Sideways scrolling
+// stops where a column starts, so none is left half hidden behind the Title. The rows scroll up
+// and down inside the sideways scroller; with touch, each swipe goes to the right one.
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
-import { WIDTHS, type Column } from '@/db/rowFormat';
 import { useThemeName } from '@/lib/displayMode';
 import { colors } from '@/lib/theme';
+import { columnWidths, HEADER_HEIGHT, jumpTarget, ROW_HEIGHT, scrollStops, type SheetColumn } from './sheetLayout';
 
-/** A column: one of the sheet's own, or "Category" (on the All page). */
-export type SheetColumn = Column | 'Category';
+export type { SheetColumn } from './sheetLayout';
 export interface SheetRow { uid: string; cells: Partial<Record<SheetColumn, string>> }
-
-const ROW_HEIGHT = 34;
-const HEADER_HEIGHT = 40;
-const widthOf = (c: SheetColumn) => Math.max(64, Math.round((c === 'Category' ? 18 : WIDTHS[c]) * 8));
-const PINNED = widthOf('Title');
 
 export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: SheetRow[] }) {
   const theme = useThemeName(); // redraw when the display changes
-  const TOTAL = columns.reduce((sum, c) => sum + widthOf(c), 0);
   const [scrollX] = useState(() => new Animated.Value(0));
   const scroller = useRef<ScrollView>(null);
   const offset = useRef(0);
   const widthNow = useRef(0); // how wide the table's window is, for the handlers
   const [viewWidth, setViewWidth] = useState(0);
   const [more, setMore] = useState({ left: false, right: true });
+
+  const widths = useMemo(() => columnWidths(columns, viewWidth), [columns, viewWidth]);
+  const PINNED = widths[0];
+  const TOTAL = widths.reduce((a, b) => a + b, 0);
+  const stops = useMemo(() => scrollStops(widths, viewWidth), [widths, viewWidth]);
   const scrollable = viewWidth > 0 && TOTAL > viewWidth + 1;
 
   const updateArrows = useCallback((x: number) => {
@@ -47,9 +46,9 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
     [scrollX, updateArrows],
   );
 
-  /** Jump most of a screen left or right (a little overlap keeps your place). */
+  /** Bring the column cut off at that edge fully into view. */
   const jump = (direction: 1 | -1) => {
-    const to = Math.max(0, Math.min(TOTAL - widthNow.current, offset.current + direction * Math.max(120, widthNow.current - PINNED - 40)));
+    const to = jumpTarget(stops, offset.current, widthNow.current, PINNED, direction);
     scroller.current?.scrollTo({ x: to, animated: true });
     updateArrows(to);
   };
@@ -61,7 +60,7 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
       transform: [{ translateX: scrollX }], borderRightWidth: 2, borderRightColor: colors.cardBorder,
       borderBottomWidth: 1, borderBottomColor: colors.bg,
     }}>
-      <Text numberOfLines={1} style={{ color: colors.text, fontSize: header ? 12 : 13, fontWeight: header ? '700' : '600' }}>{text}</Text>
+      <Text numberOfLines={header ? 1 : 2} style={{ color: colors.text, fontSize: header ? 12 : 13, fontWeight: header ? '700' : '600' }}>{text}</Text>
     </Animated.View>
   );
 
@@ -72,12 +71,12 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
       updateArrows(offset.current);
     }}>
       <Animated.ScrollView ref={scroller} horizontal persistentScrollbar style={{ flex: 1 }} contentContainerStyle={{ width: TOTAL }}
-        scrollEventThrottle={16} onScroll={onScroll}>
+        scrollEventThrottle={16} onScroll={onScroll} snapToOffsets={stops} decelerationRate="fast">
         <View style={{ width: TOTAL, flex: 1 }}>
           <View style={{ flexDirection: 'row', height: HEADER_HEIGHT, zIndex: 2 }}>
             {columns.map((c, i) => (
               <View key={c} style={{
-                width: widthOf(c), backgroundColor: colors.chip, justifyContent: 'center', paddingHorizontal: 8,
+                width: widths[i], backgroundColor: colors.chip, justifyContent: 'center', paddingHorizontal: 8,
                 borderRightWidth: 1, borderRightColor: colors.bg,
               }}>
                 {i > 0 && <Text numberOfLines={1} style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>{c}</Text>}
@@ -87,7 +86,7 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
           </View>
           <FlatList
             data={rows}
-            extraData={theme}
+            extraData={[theme, widths]}
             keyExtractor={(r) => r.uid}
             getItemLayout={(_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index })}
             initialNumToRender={30}
@@ -96,10 +95,10 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
               <View style={{ flexDirection: 'row', height: ROW_HEIGHT }}>
                 {columns.map((c, i) => (
                   <View key={c} style={{
-                    width: widthOf(c), backgroundColor: colors.card, justifyContent: 'center', paddingHorizontal: 8,
+                    width: widths[i], backgroundColor: colors.card, justifyContent: 'center', paddingHorizontal: 8,
                     borderRightWidth: 1, borderRightColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.bg,
                   }}>
-                    {i > 0 && <Text numberOfLines={1} style={{ color: colors.text, fontSize: 13 }}>{item.cells[c]}</Text>}
+                    {i > 0 && <Text numberOfLines={2} style={{ color: colors.text, fontSize: 13 }}>{item.cells[c]}</Text>}
                   </View>
                 ))}
                 {pinned(item.cells.Title ?? '', false)}

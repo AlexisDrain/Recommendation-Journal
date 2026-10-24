@@ -107,6 +107,18 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE items ADD COLUMN manual_pos REAL;
   UPDATE items SET manual_pos = (SELECT count(*) FROM items AS o WHERE o.created_at < items.created_at OR (o.created_at = items.created_at AND o.id <= items.id));
   `,
+
+  // 7 — the starter categories' names in the plural ("Movie" → "Movies"), where you haven't renamed
+  // them yourself. Stamped now, so the new names reach the Google Sheet and rename its tabs too.
+  `
+  UPDATE categories SET name = 'Non-fiction books', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-nonfiction' AND name = 'Non-fiction book';
+  UPDATE categories SET name = 'Fiction books', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-fiction' AND name = 'Fiction book';
+  UPDATE categories SET name = 'Video games', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-videogame' AND name = 'Video game';
+  UPDATE categories SET name = 'TV shows', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-tvshow' AND name = 'TV show';
+  UPDATE categories SET name = 'Movies', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-movie' AND name = 'Movie';
+  UPDATE categories SET name = 'Music albums', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-album' AND name = 'Music album';
+  UPDATE categories SET name = 'Cooking recipes', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-recipe' AND name = 'Cooking recipe';
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase) {

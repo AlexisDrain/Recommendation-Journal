@@ -7,7 +7,7 @@ export type Status = 'want' | 'done';
 export type Rating = 1 | 2 | 3 | 4;
 
 /**
- * A kind of thing people recommend: "Movie", "Fiction book", "Flash game"…
+ * A kind of thing people recommend: "Movies", "Fiction books", "Flash games"…
  * Each one is its own tab in the Google Sheet and in the .xlsx export.
  */
 export interface Category {

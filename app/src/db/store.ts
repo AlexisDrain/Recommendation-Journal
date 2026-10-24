@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SQLite from 'expo-sqlite';
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
-import { normalize, tidyWords } from '@/lib/categories';
+import { categoryKey, tidyWords } from '@/lib/categories';
 import { stamp, today } from '@/lib/dates';
 import type { Category, CategoryPatch, Item, ItemPatch } from '@/lib/types';
 import { migrate } from './migrations';
@@ -307,12 +307,12 @@ export async function writeItem(tx: SQLite.SQLiteDatabase, it: Omit<Item, 'id' |
 
 /** The category with this name (ignoring case, spaces and punctuation), if there is one. */
 export const categoryNamed = (name: string, list = data.categories) =>
-  list.find((c) => !c.deleted && normalize(c.name) === normalize(name));
+  list.find((c) => !c.deleted && categoryKey(c.name) === categoryKey(name));
 
 const CATEGORY_COLUMNS = { name: 'name', noun: 'noun', wantLabel: 'want_label', doneLabel: 'done_label', hidden: 'hidden' } as const;
 
 const categories = {
-  /** Adds a category at the end. Words left out are guessed from the name ("Flash game" → play). */
+  /** Adds a category at the end. Words left out are guessed from the name ("Flash games" → play). */
   create: async (body: { name: string } & Partial<CategoryPatch>): Promise<Category> => {
     const name = body.name.trim();
     if (!name) throw new Error('Give the category a name.');

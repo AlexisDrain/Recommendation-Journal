@@ -5,7 +5,7 @@
 // "Name", "Notes", "Year read"…) and each tab without a Category column becomes a category named
 // after the tab. Things already on your list (same title in the same category) are skipped.
 import * as DocumentPicker from 'expo-document-picker';
-import { normalize, suggestWords } from '@/lib/categories';
+import { categoryKey, normalize, suggestWords } from '@/lib/categories';
 import { stamp, today } from '@/lib/dates';
 import type { Category, Item } from '@/lib/types';
 import { readPickedBytes, readPickedText, shareFile } from './files';
@@ -121,7 +121,7 @@ export async function importTables(tables: { name: string; rows: string[][] }[],
   const db = await getDb();
   await transaction(db, async (tx) => {
     const categoryFor = async (name: string): Promise<Category> => {
-      const found = categories.find((c) => normalize(c.name) === normalize(name));
+      const found = categories.find((c) => categoryKey(c.name) === categoryKey(name));
       if (found) return found;
       const c: Category = { id: 0, uid: newUid(), name, ...suggestWords(name), sortOrder: ++order, hidden: false, deleted: false, updatedAt: now };
       await writeCategory(tx, c);

@@ -2,18 +2,14 @@
 // ways. The header row and the Title column are pinned by the browser (CSS "sticky"), so the
 // mouse wheel, Shift + wheel, a trackpad, middle-click scrolling and the scrollbars all work
 // anywhere over the table. Round edge arrows show (and jump to) the columns that are off screen.
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { WIDTHS, type Column } from '@/db/rowFormat';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThemeName } from '@/lib/displayMode';
 import { colors } from '@/lib/theme';
+import { columnWidths, HEADER_HEIGHT, jumpTarget, ROW_HEIGHT, scrollStops, type SheetColumn } from './sheetLayout';
 
-/** A column: one of the sheet's own, or "Category" (on the All page). */
-export type SheetColumn = Column | 'Category';
+export type { SheetColumn } from './sheetLayout';
 export interface SheetRow { uid: string; cells: Partial<Record<SheetColumn, string>> }
 
-const widthOf = (c: SheetColumn) => Math.max(64, Math.round((c === 'Category' ? 18 : WIDTHS[c]) * 8));
-const PINNED = widthOf('Title');
-const HEADER_HEIGHT = 40;
 // The app's own text font (React Native Web's), which plain HTML doesn't pick up by itself.
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
@@ -21,10 +17,14 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
   useThemeName(); // redraw when the display changes (dark / light)
   const box = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState({ left: false, right: false });
+  const [viewWidth, setViewWidth] = useState(0);
+  const widths = useMemo(() => columnWidths(columns, viewWidth), [columns, viewWidth]);
+  const PINNED = widths[0];
 
   const update = useCallback(() => {
     const el = box.current;
     if (!el) return;
+    setViewWidth(el.clientWidth);
     const next = { left: el.scrollLeft > 8, right: el.scrollLeft < el.scrollWidth - el.clientWidth - 8 };
     setMore((prev) => (prev.left === next.left && prev.right === next.right ? prev : next));
   }, []);
@@ -38,34 +38,42 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
     return () => resized.disconnect();
   }, [update, rows.length]);
 
-  /** Jump most of a screen left or right (a little overlap keeps your place). */
+  /** Bring the column cut off at that edge fully into view. */
   const jump = (direction: 1 | -1) => {
     const el = box.current;
-    if (el) el.scrollBy({ left: direction * Math.max(120, el.clientWidth - PINNED - 40), behavior: 'smooth' });
+    if (!el) return;
+    const to = jumpTarget(scrollStops(widths, el.clientWidth), el.scrollLeft, el.clientWidth, PINNED, direction);
+    el.scrollTo({ left: to, behavior: 'smooth' });
   };
 
-  const cell = (c: SheetColumn, header: boolean): React.CSSProperties => ({
-    minWidth: widthOf(c), maxWidth: widthOf(c), width: widthOf(c), boxSizing: 'border-box',
-    padding: '0 8px', height: header ? HEADER_HEIGHT : 34, textAlign: 'left',
-    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  const cell = (i: number, header: boolean): React.CSSProperties => ({
+    minWidth: widths[i], maxWidth: widths[i], width: widths[i], boxSizing: 'border-box',
+    padding: '0 8px', height: header ? HEADER_HEIGHT : ROW_HEIGHT, textAlign: 'left', verticalAlign: 'middle',
+    whiteSpace: header ? 'nowrap' : 'normal', overflow: 'hidden', textOverflow: 'ellipsis',
     background: header ? colors.chip : colors.card, color: colors.text,
-    fontSize: header ? 12 : 13, fontWeight: header || c === 'Title' ? 700 : 400,
+    fontSize: header ? 12 : 13, fontWeight: header || i === 0 ? 700 : 400,
     borderRight: `1px solid ${colors.bg}`, borderBottom: `1px solid ${colors.bg}`,
     // the header row stays on top, the Title column on the left, and their corner above both
-    ...(header && { position: 'sticky', top: 0, zIndex: c === 'Title' ? 3 : 2 }),
-    ...(c === 'Title' && { position: 'sticky', left: 0, zIndex: header ? 3 : 1, borderRight: `2px solid ${colors.cardBorder}` }),
+    ...(header && { position: 'sticky', top: 0, zIndex: i === 0 ? 3 : 2 }),
+    ...(i === 0 && { position: 'sticky', left: 0, zIndex: header ? 3 : 1, borderRight: `2px solid ${colors.cardBorder}` }),
   });
+  // At most two lines in a cell, then "…".
+  const twoLines: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '17px' };
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', minHeight: 0 }}>
       <div ref={box} onScroll={update} style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontFamily: FONT }}>
           <thead>
-            <tr>{columns.map((c) => <th key={c} style={cell(c, true)}>{c}</th>)}</tr>
+            <tr>{columns.map((c, i) => <th key={c} style={cell(i, true)}>{c}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.uid}>{columns.map((c) => <td key={c} style={cell(c, false)} title={r.cells[c]}>{r.cells[c]}</td>)}</tr>
+              <tr key={r.uid}>
+                {columns.map((c, i) => (
+                  <td key={c} style={cell(i, false)} title={r.cells[c]}><div style={twoLines}>{r.cells[c]}</div></td>
+                ))}
+              </tr>
             ))}
           </tbody>
         </table>

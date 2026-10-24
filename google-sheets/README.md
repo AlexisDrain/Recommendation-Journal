@@ -1,7 +1,7 @@
 # Google Sheet sync: setup
 
 Recommendation Journal can keep your list in **your own private Google Sheet**: one tab per
-category (Movie, Fiction book, Flash game…), and edits in either place sync both ways (the newest
+category (Movies, Fiction books, Flash games…), and edits in either place sync both ways (the newest
 edit of a row wins).
 
 The app never asks for your Google login. Instead, a small script inside your sheet accepts
