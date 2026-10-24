@@ -2,7 +2,7 @@
 // press Enter (or tap "+ Add") to add it, already filled in with what you typed.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { CategoryPicker, CategoryTabs } from '@/components/CategoryTabs';
 import { CategoryEditor } from '@/components/CategoryEditor';
 import { ItemEditor, type ItemDraft } from '@/components/ItemEditor';
@@ -61,7 +61,7 @@ export default function ListScreen() {
   const [adding, setAdding] = useState<Partial<ItemDraft> | null>(null);
   const [newCategory, setNewCategory] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
   const wide = useWide();
 
   const visible = useMemo(() => categories.filter((c) => !c.hidden), [categories]);
@@ -255,7 +255,7 @@ export default function ListScreen() {
             <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected}
               onPress={onPress} hasDraft={!!drafts[item.uid]} />
           )}
-          ListEmptyComponent={loaded ? (
+          ListEmptyComponent={!loaded ? undefined : (
             <View style={{ padding: space.xl, gap: space.sm, alignItems: 'center' }}>
               <Text style={{ color: colors.text, fontSize: 17, textAlign: 'center' }}>
                 {query ? 'Nothing matches yet.' : items.length ? 'Nothing here yet.' : 'Your list is empty.'}
@@ -264,7 +264,7 @@ export default function ListScreen() {
                 {query ? 'Press Enter to add it.' : 'Type a title in the box above and press Enter to add your first recommendation.'}
               </Muted>
             </View>
-          ) : null}
+          )}
         />
         )}
       </View>

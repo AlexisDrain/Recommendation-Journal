@@ -5,7 +5,7 @@
 // stops where a column starts, so none is left half hidden behind the Title. The rows scroll up
 // and down inside the sideways scroller; with touch, each swipe goes to the right one.
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated, FlatList, Pressable, Text, View, type ScrollViewInstance } from 'react-native';
 import { useThemeName } from '@/lib/displayMode';
 import { colors } from '@/lib/theme';
 import { columnWidths, HEADER_HEIGHT, jumpTarget, ROW_HEIGHT, scrollStops, type SheetColumn } from './sheetLayout';
@@ -16,7 +16,7 @@ export interface SheetRow { uid: string; cells: Partial<Record<SheetColumn, stri
 export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: SheetRow[] }) {
   const theme = useThemeName(); // redraw when the display changes
   const [scrollX] = useState(() => new Animated.Value(0));
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<ScrollViewInstance>(null);
   const offset = useRef(0);
   const widthNow = useRef(0); // how wide the table's window is, for the handlers
   const [viewWidth, setViewWidth] = useState(0);
