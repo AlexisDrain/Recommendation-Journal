@@ -13,7 +13,7 @@ import { colors, radius, space } from '@/lib/theme';
 import type { Item, Rating, Status } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
 import { DateField } from './DateField';
-import { Panel, useCloseHandler, useCloseRequest, useOpening } from './Panel';
+import { Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
 import { Button, Chip, Input, styles } from './ui';
 
 /** Above this many categories the panel shows only the most-used ones, with a "+ N more" chip. */
@@ -139,6 +139,7 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
     onClose();
   };
   useCloseHandler(registerClose, close);
+  const { scroll, onScroll, reveal } = useRevealFocused();
   /** Throw the draft away: back to the saved version (or an empty new one). */
   const discard = () => {
     dropDraft(draftKey);
@@ -159,7 +160,9 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
   const n = () => ++section; // sections are numbered as they're drawn, so a hidden one leaves no gap
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.md }}>
+    <>
+    <ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled"
+      style={{ flexShrink: 1, flexGrow: 0 }} contentContainerStyle={{ gap: space.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: space.md }}>
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', flex: 1 }}>
           {item ? 'Edit' : `Add ${withArticle(category?.noun || 'recommendation')}`}
@@ -171,10 +174,10 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
 
       <Section n={n()} title="What is it?" />
       <Input placeholder="Title" value={draft.title} onChangeText={(title) => set({ title })}
-        autoFocus={!item && !draft.title} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Title" />
+        autoFocus={!item && !draft.title} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Title" />
       {duplicate && <Text style={{ color: colors.warm }}>Already on your list in this category.</Text>}
       <Input placeholder="Author (or director, artist…), like Stephen King" value={draft.author}
-        onChangeText={(author) => set({ author })} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
+        onChangeText={(author) => set({ author })} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
 
       <Section n={n()} title="Category" />
       <View style={styles.chips}>
@@ -202,14 +205,14 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
 
       <Section n={n()} title="Who recommended it, and why?" />
       <Input placeholder="Who? (my brother, a stranger in the park…)" value={draft.recommendedBy}
-        onChangeText={(recommendedBy) => set({ recommendedBy })} accessibilityLabel="Recommended by" />
+        onChangeText={(recommendedBy) => set({ recommendedBy })} onFocus={reveal} accessibilityLabel="Recommended by" />
       {suggestions.length > 0 && (
         <View style={styles.chips}>
           {suggestions.map((p) => <Chip key={p} label={p} onPress={() => set({ recommendedBy: p })} />)}
         </View>
       )}
       <Input placeholder="Why? What did they say about it?" value={draft.note} onChangeText={(note) => set({ note })}
-        multiline accessibilityLabel="Why it was recommended" />
+        multiline onFocus={reveal} accessibilityLabel="Why it was recommended" />
 
       <Section n={n()} title={`${category?.doneLabel || 'Done'} it? When?`} />
       <View style={styles.chips}>
@@ -243,6 +246,9 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       )}
 
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
+    </ScrollView>
+    {/* Pinned below the scrolling part: always in sight, just above the keyboard while typing. */}
+    <View style={{ gap: space.sm }}>
       {/* Unsaved changes (just made, or a draft kept from before): throw them away. */}
       {changed && (
         <Button title="Discard changes" onPress={discard} small color={colors.chip} textColor={colors.warm} />
@@ -257,7 +263,8 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
           </View>
         )}
       </View>
-    </ScrollView>
+    </View>
+    </>
   );
 }
 

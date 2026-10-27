@@ -91,15 +91,36 @@ npx eas-cli@latest update:configure
 Then:
 
 ```bash
-npm run release        # new build number, then web (EAS Hosting) + phone (EAS Update, preview channel)
+npm run release        # new build number, then web (EAS Hosting) + phone (EAS Update, preview and production channels)
 ```
 
 `npm run release:web` publishes only the web version (new build number); `npm run release:phone`
 sends that same build to the phone. **Settings → About** shows the version and build number.
+Stop the web dev server first: the two share Metro's cache, and the phone export can fail on it.
 
 `app.json` uses `"runtimeVersion": { "policy": "sdkVersion" }`, the runtime Expo Go has. Expo Go
-only opens EAS Updates from projects your own Expo account owns, so other people need the web
-version or an Android build (`npx eas-cli@latest build -p android --profile preview`).
+only opens EAS Updates from projects your own Expo account owns, so other people need a build:
+
+| Who | How | Cost |
+|---|---|---|
+| You, in Expo Go | `npm run release:phone` (preview channel) | Free |
+| Anyone, in a browser | https://recommendation-journal.expo.app (EAS Hosting) | Free tier |
+| Anyone on Android | `npx eas-cli@latest build -p android --profile preview` → share the `.apk` | Free tier |
+| Testers on iPhone | TestFlight (below) | Apple Developer Program |
+
+**TestFlight.** The installed app follows the `production` update channel, which `npm run release`
+also publishes to, so testers get each release without a new build. A new build is only needed
+when the native side changes (a new Expo SDK, or a package with native code). Build it in the
+cloud and send it to App Store Connect in one go (it asks you to sign in to Apple the first time,
+and sets up the app's certificates and its App Store Connect entry):
+
+```bash
+cd app
+npx eas-cli@latest build -p ios --profile production --auto-submit
+```
+
+When it's processed (an email from Apple, 10–30 minutes later), add testers in App Store Connect →
+the app → TestFlight. The app's ID is `io.github.alexisdrain.recommendationjournal`.
 
 ## Privacy & security notes
 

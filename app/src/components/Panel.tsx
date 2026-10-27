@@ -3,7 +3,7 @@
 //   Wide screens: a dialog in the middle of the screen.
 // Either way the dimmed background covers the whole screen, and tapping it closes the panel.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { colors, radius, space } from '@/lib/theme';
 import { useWide } from '@/lib/useLayout';
 
@@ -60,6 +60,37 @@ export function useCloseRequest(onClose: () => void) {
   const register = useCallback((fn: (() => void) | null) => { handler.current = fn; }, []);
   const requestClose = useCallback(() => (handler.current ?? onClose)(), [onClose]);
   return { register, requestClose };
+}
+
+/**
+ * For a panel's scrolling form: keeps the box you're typing in visible above the keyboard. The
+ * panel shrinks to sit above the keyboard, but its content doesn't scroll by itself, so the box
+ * could end up hidden below the fold. Pass `scroll` and `onScroll` to the ScrollView, and `reveal`
+ * to each box's onFocus (for moving between boxes while the keyboard stays open).
+ */
+export function useRevealFocused() {
+  const scroll = useRef<ScrollViewInstance>(null);
+  const offset = useRef(0);
+  const reveal = useCallback(() => {
+    // After the panel has settled into its new size.
+    setTimeout(() => {
+      const input = TextInput.State?.currentlyFocusedInput?.();
+      const view = scroll.current;
+      if (!input || !view) return;
+      input.measureInWindow((_x, top, _w, height) => view.measureInWindow((_vx, viewTop, _vw, viewHeight) => {
+        const below = top + height + space.md - (viewTop + viewHeight);
+        const above = viewTop + space.md - top;
+        if (below > 0) view.scrollTo({ y: offset.current + below, animated: true });
+        else if (above > 0) view.scrollTo({ y: Math.max(0, offset.current - above), animated: true });
+      }));
+    }, 60);
+  }, []);
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', reveal);
+    return () => sub.remove();
+  }, [reveal]);
+  const onScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => { offset.current = e.nativeEvent.contentOffset.y; }, []);
+  return { scroll, onScroll, reveal };
 }
 
 /** For the form inside a panel: what closing it does (see useCloseRequest). */

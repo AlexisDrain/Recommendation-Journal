@@ -13,9 +13,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "io.github.alexisdrain.recommendationjournal",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "io.github.alexisdrain.recommendationjournal",
       "adaptiveIcon": {
         "backgroundColor": "#0e1120",
         "foregroundImage": "./assets/android-icon-foreground.png",

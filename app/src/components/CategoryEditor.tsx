@@ -6,7 +6,7 @@ import { confirmAction } from '@/lib/confirm';
 import { colors, space } from '@/lib/theme';
 import type { Category } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
-import { Panel, useCloseHandler, useCloseRequest, useOpening } from './Panel';
+import { Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
 import { Button, Muted, Row } from './ui';
 
 interface Props {
@@ -59,6 +59,7 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
   };
 
   useCloseHandler(registerClose, onClose); // closing without saving just closes
+  const { scroll, onScroll } = useRevealFocused();
 
   const remove = async () => {
     if (!category) return;
@@ -74,7 +75,9 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
   };
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.md }}>
+    <>
+    <ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled"
+      style={{ flexShrink: 1, flexGrow: 0 }} contentContainerStyle={{ gap: space.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: space.md }}>
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{category ? 'Edit category' : 'New category'}</Text>
         <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
@@ -90,16 +93,18 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
       )}
       {category && <Muted>Hidden categories are left off the list and the add screen. Their recommendations are kept.</Muted>}
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <View style={{ flex: 1 }}>
-          <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
-        </View>
-        {category && (
-          <View style={{ flex: 1 }}>
-            <Button title="Delete" onPress={remove} color={colors.danger} />
-          </View>
-        )}
-      </View>
     </ScrollView>
+    {/* Pinned below the scrolling part: always in sight, just above the keyboard while typing. */}
+    <View style={{ flexDirection: 'row', gap: space.sm }}>
+      <View style={{ flex: 1 }}>
+        <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
+      </View>
+      {category && (
+        <View style={{ flex: 1 }}>
+          <Button title="Delete" onPress={remove} color={colors.danger} />
+        </View>
+      )}
+    </View>
+    </>
   );
 }
