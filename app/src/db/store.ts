@@ -63,11 +63,18 @@ export async function allItems(): Promise<Item[]> {
 
 // ---------- the in-memory copy ----------
 
+/** How long a deleted recommendation can be restored before it's erased for good. */
+export const DELETED_DAYS = 15;
+
 export interface Data {
   /** Not deleted, in order (hidden ones included; screens leave them out where it matters). */
   categories: Category[];
   /** Not deleted, newest first. */
   items: Item[];
+  /** Deleted in the last DELETED_DAYS days, the most recently deleted first ("Recently deleted"). */
+  deleted: Item[];
+  /** Deleted categories, for naming the category of a deleted item. */
+  deletedCategories: Category[];
   loaded: boolean;
   error: string | null;
 }
@@ -88,7 +95,7 @@ function webStorage(): Storage | null {
 function fromSnapshot(raw: string | null): Data | null {
   try {
     const s = raw ? (JSON.parse(raw) as Pick<Data, 'categories' | 'items'>) : null;
-    return s && Array.isArray(s.categories) && Array.isArray(s.items) ? { categories: s.categories, items: s.items, loaded: true, error: null } : null;
+    return s && Array.isArray(s.categories) && Array.isArray(s.items) ? { categories: s.categories, items: s.items, deleted: [], deletedCategories: [], loaded: true, error: null } : null;
   } catch {
     return null;
   }
@@ -108,7 +115,7 @@ function saveSnapshot() {
   }
 }
 
-let data: Data = fromSnapshot(webStorage()?.getItem(SNAPSHOT_KEY) ?? null) ?? { categories: [], items: [], loaded: false, error: null };
+let data: Data = fromSnapshot(webStorage()?.getItem(SNAPSHOT_KEY) ?? null) ?? { categories: [], items: [], deleted: [], deletedCategories: [], loaded: false, error: null };
 /** True once the database itself has been read (until then `data` may be the snapshot). */
 let fresh = false;
 const listeners = new Set<() => void>();
@@ -120,6 +127,8 @@ export async function reload(): Promise<void> {
     data = {
       categories: categories.filter((c) => !c.deleted),
       items: items.filter((i) => !i.deleted).reverse(),
+      deleted: items.filter((i) => i.deleted).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
+      deletedCategories: categories.filter((c) => c.deleted),
       loaded: true,
       error: null,
     };
@@ -223,18 +232,47 @@ const items = {
       [...cols.map(([k]) => p[k as keyof ItemPatch] ?? null), stamp(), uid],
     );
     await changed();
+    if (before?.queuePos != null && p.queuePos === null) await closePriorityGap(); // done: the rest move up
   },
 
   /** Deletes an item. It's kept as "deleted" so the deletion reaches the sheet; undo brings it back. */
   remove: async (uid: string) => {
+    const before = data.items.find((i) => i.uid === uid);
     await (await getDb()).runAsync(`UPDATE items SET deleted = 1, updated_at = ? WHERE uid = ?`, stamp(), uid);
     await changed();
+    if (before?.queuePos != null) await closePriorityGap();
   },
+  /**
+   * Brings a deleted item back (Undo, or the Recently deleted page). A priority goes back on the end
+   * of Priority, and a category deleted along with it comes back too.
+   */
   undoRemove: async (uid: string) => {
-    await (await getDb()).runAsync(`UPDATE items SET deleted = 0, updated_at = ? WHERE uid = ?`, stamp(), uid);
+    const db = await getDb();
+    const it = await db.getFirstAsync<{ categoryUid: string; queuePos: number | null }>(
+      `SELECT category_uid AS categoryUid, queue_pos AS queuePos FROM items WHERE uid = ?`, uid);
+    if (!it) return;
+    const now = stamp();
+    const last = upNext.list().reduce((m, i) => Math.max(m, i.queuePos!), 0);
+    await transaction(db, async (tx) => {
+      await tx.runAsync(`UPDATE items SET deleted = 0, queue_pos = ?, updated_at = ? WHERE uid = ?`, it.queuePos != null ? last + 1 : null, now, uid);
+      await tx.runAsync(`UPDATE categories SET deleted = 0, updated_at = ? WHERE uid = ? AND deleted = 1`, now, it.categoryUid);
+    });
     await changed();
   },
+
+  /**
+   * Erases for good what was deleted before `before` (an "Updated" time): it's no longer in
+   * Recently deleted. True if anything was erased.
+   */
+  eraseDeleted: async (before: string): Promise<boolean> => {
+    const r = await (await getDb()).runAsync(`DELETE FROM items WHERE deleted = 1 AND updated_at < ?`, before);
+    if (r.changes) await reload();
+    return r.changes > 0;
+  },
 };
+
+/** Numbers the priorities 1, 2, 3… again after one left (done or deleted), so #2 becomes #1. */
+const closePriorityGap = () => upNext.reorder(upNext.list().map((i) => i.uid));
 
 /**
  * "My order": puts these items in this order (after a drag), using the places they already had,
@@ -256,8 +294,20 @@ async function reorderManually(uids: string[]) {
 
 /** "Priority" (called upNext in the code): the things you mean to get to first, in your own order. */
 const upNext = {
-  /** The priorities, in order. */
-  list: (all = data.items) => all.filter((i) => i.queuePos != null).sort((a, b) => a.queuePos! - b.queuePos!),
+  /**
+   * The priorities, in order. Two can share a number after a sync mixes two devices' numbering:
+   * then the one placed there most recently comes first (the same on every device).
+   */
+  list: (all = data.items) => all.filter((i) => i.queuePos != null).sort((a, b) =>
+    a.queuePos! - b.queuePos! || (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.uid < b.uid ? -1 : 1)),
+
+  /** Numbers the priorities 1, 2, 3… if they aren't already (after a sync). True if anything changed. */
+  tidy: async (): Promise<boolean> => {
+    const list = upNext.list();
+    if (list.every((it, i) => it.queuePos === i + 1)) return false;
+    await upNext.reorder(list.map((i) => i.uid));
+    return true;
+  },
 
   /** Makes an item the last priority. */
   add: async (uid: string) => {

@@ -119,6 +119,16 @@ export const MIGRATIONS: string[] = [
   UPDATE categories SET name = 'Music albums', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-album' AND name = 'Music album';
   UPDATE categories SET name = 'Cooking recipes', updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE uid = 'default-recipe' AND name = 'Cooking recipe';
   `,
+
+  // 8 — Priority numbered 1, 2, 3… with no gaps: things marked done used to leave theirs behind.
+  // Not stamped (every device works out the same numbers), so other edits to these rows aren't
+  // overwritten; the sheet's numbers catch up the next time Priority changes.
+  `
+  UPDATE items SET queue_pos = (
+    SELECT count(*) FROM items AS o WHERE o.deleted = 0 AND o.queue_pos IS NOT NULL
+      AND (o.queue_pos < items.queue_pos OR (o.queue_pos = items.queue_pos AND o.id <= items.id)))
+  WHERE deleted = 0 AND queue_pos IS NOT NULL;
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase) {

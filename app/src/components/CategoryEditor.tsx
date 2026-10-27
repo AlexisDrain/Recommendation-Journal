@@ -90,8 +90,16 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
       )}
       {category && <Muted>Hidden categories are left off the list and the add screen. Their recommendations are kept.</Muted>}
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
-      <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
-      {category && <Button title="Delete category" onPress={remove} small color={colors.chip} textColor={colors.danger} />}
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <View style={{ flex: 1 }}>
+          <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
+        </View>
+        {category && (
+          <View style={{ flex: 1 }}>
+            <Button title="Delete" onPress={remove} color={colors.danger} />
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }

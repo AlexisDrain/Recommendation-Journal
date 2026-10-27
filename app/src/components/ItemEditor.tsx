@@ -247,10 +247,16 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       {changed && (
         <Button title="Discard changes" onPress={discard} small color={colors.chip} textColor={colors.warm} />
       )}
-      <Button title={item ? 'Save' : 'Add'} onPress={save} busy={busy} disabled={!draft.title.trim()} />
-      {item && (
-        <Button title="Delete" onPress={remove} small color={colors.chip} textColor={colors.danger} />
-      )}
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <View style={{ flex: 1 }}>
+          <Button title={item ? 'Save' : 'Add'} onPress={save} busy={busy} disabled={!draft.title.trim()} />
+        </View>
+        {item && (
+          <View style={{ flex: 1 }}>
+            <Button title="Delete" onPress={remove} color={colors.danger} />
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }

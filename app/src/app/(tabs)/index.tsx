@@ -1,18 +1,20 @@
 // The list. One box does both jobs: type to search everything you've saved; if it isn't there,
 // press Enter (or tap "+ Add") to add it, already filled in with what you typed.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { CategoryPicker, CategoryTabs } from '@/components/CategoryTabs';
 import { CategoryEditor } from '@/components/CategoryEditor';
+import { DeletedRow } from '@/components/DeletedRow';
 import { ItemEditor, type ItemDraft } from '@/components/ItemEditor';
 import { ItemRow } from '@/components/ItemRow';
 import { SortableList } from '@/components/SortableList';
 import { SyncChip } from '@/components/SyncChip';
 import { Toast, type ToastMessage } from '@/components/Toast';
 import { Chip, ErrorBox, Muted, styles } from '@/components/ui';
-import { reload, store, useData } from '@/db/store';
-import { syncNow, useSyncStatus } from '@/db/sync';
+import { DELETED_DAYS, reload, store, useData } from '@/db/store';
+import { eraseAllDeleted, syncNow, useSyncStatus } from '@/db/sync';
+import { confirmAction } from '@/lib/confirm';
 import { withArticle } from '@/lib/categories';
 import { useThemeName } from '@/lib/displayMode';
 import { useDrafts } from '@/lib/drafts';
@@ -22,6 +24,8 @@ import type { Item, Status } from '@/lib/types';
 import { page, useWide, WIDE_PAGE } from '@/lib/useLayout';
 
 type Sort = 'manual' | 'newest' | 'title' | 'rating';
+/** Rows you can drag at once in "My order": drawing hundreds of draggable rows makes Rearrange slow on a phone. */
+const REARRANGE_PAGE = 50;
 const SORTS: [Sort, string][] = [['manual', 'My order'], ['newest', 'Newest'], ['title', 'A–Z'], ['rating', 'Best rated']];
 
 /** The sort you picked last (remembered on this device). "My order" starts as newest first. */
@@ -44,15 +48,19 @@ function rememberCategory(uid: string) {
 
 export default function ListScreen() {
   useThemeName(); // redraw when the display changes (dark / light)
-  const { categories, items, loaded, error } = useData();
+  const { categories, items, deleted, deletedCategories, loaded, error } = useData();
   const drafts = useDrafts();
   const [query, setQuery] = useState('');
-  /** A category's uid, 'all', or 'upnext'. */
+  /** A category's uid, 'all', 'upnext' (Priority) or 'deleted' (Recently deleted). */
   const [categoryUid, setCategoryUid] = useState<string>('all');
   const [status, setStatus] = useState<Status | 'all'>('all');
   const [sort, setSortState] = useState<Sort>(lastSort);
   /** "My order" with the ≡ grips showing (iOS-style: a button switches dragging on and off). */
   const [rearranging, setRearranging] = useState(false);
+  // The button answers at once; the draggable list (slower to draw) follows a moment later.
+  const listRearranging = useDeferredValue(rearranging);
+  /** How many rows of "My order" are draggable: all of a long list is too slow to draw. */
+  const [rearrangeCount, setRearrangeCount] = useState(REARRANGE_PAGE);
   const setSort = (next: Sort) => {
     setSortState(next);
     rememberSort(next);
@@ -68,6 +76,10 @@ export default function ListScreen() {
   const byUid = useMemo(() => new Map(categories.map((c) => [c.uid, c])), [categories]);
   const selected = byUid.get(categoryUid) ?? null;
   const upNextMode = categoryUid === 'upnext';
+  const deletedMode = categoryUid === 'deleted';
+  /** Every category, deleted ones too: a deleted recommendation may be in one. */
+  const anyCategory = useMemo(() => new Map([...categories, ...deletedCategories].map((c) => [c.uid, c])), [categories, deletedCategories]);
+  const deletedShown = useMemo(() => search(deleted, categories, query), [deleted, categories, query]);
   const hiddenUids = useMemo(() => new Set(categories.filter((c) => c.hidden).map((c) => c.uid)), [categories]);
 
   // Searching looks through everything; the chips narrow it down.
@@ -85,6 +97,12 @@ export default function ListScreen() {
     }
     return list;
   }, [inCategory, categories, query, status, sort]);
+  /** While searching inside one category (or Priority, or Recently deleted): matches elsewhere. */
+  const matchesElsewhere = useMemo(() => {
+    if (!query.trim() || categoryUid === 'all') return 0;
+    const everywhere = search(items.filter((i) => !hiddenUids.has(i.categoryUid)), categories, query).length;
+    return deletedMode ? everywhere : everywhere - search(inCategory, categories, query).length;
+  }, [query, categoryUid, items, hiddenUids, categories, deletedMode, inCategory]);
   const perCategory = useMemo(() => {
     const m = new Map<string, number>([['all', 0], ['upnext', 0]]);
     for (const i of items) {
@@ -93,8 +111,9 @@ export default function ListScreen() {
       m.set('all', m.get('all')! + 1);
       if (i.queuePos != null) m.set('upnext', m.get('upnext')! + 1);
     }
+    m.set('deleted', deleted.length);
     return m;
-  }, [items, hiddenUids]);
+  }, [items, hiddenUids, deleted]);
   const counts = useMemo(() => ({
     want: inCategory.filter((i) => i.status === 'want').length,
     done: inCategory.filter((i) => i.status === 'done').length,
@@ -111,6 +130,24 @@ export default function ListScreen() {
   });
 
   const onPress = useCallback((item: Item) => setEditing(item), []);
+  const eraseAll = async () => {
+    const n = deleted.length;
+    const ok = await confirmAction(
+      n === 1 ? 'Erase it for good?' : `Erase all ${n} for good?`,
+      `Everything in Recently deleted will be erased now. It can't be restored after this.`,
+      'Erase all',
+    );
+    if (!ok) return;
+    const left = await eraseAllDeleted();
+    setToast({
+      text: left
+        ? `Erased ${n - left}. ${left} haven't reached your Google Sheet yet: try again once it has synced.`
+        : `Erased ${n} for good.`,
+    });
+  };
+  const onRestore = useCallback((item: Item) => {
+    store.items.undoRemove(item.uid).then(() => setToast({ text: `Restored “${item.title}”.` }), (e) => setToast({ text: (e as Error).message }));
+  }, []);
   const hideToast = useCallback(() => setToast(null), []);
 
   // Saving never waits for the Google Sheet. If a sync fails afterwards, say so once (a new
@@ -160,6 +197,18 @@ export default function ListScreen() {
         )}
       </View>
 
+      {query.trim() !== '' && categoryUid !== 'all' && (
+        // Searching inside one category: say so, and offer the rest.
+        <View style={[styles.chips, { alignItems: 'center' }]}>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Text style={{ color: colors.warm }}>
+              Searching only in {selected?.name ?? (upNextMode ? '★ Priority' : 'Recently deleted')}.
+              {matchesElsewhere > 0 && ` ${matchesElsewhere} more ${matchesElsewhere === 1 ? 'match' : 'matches'} in ${deletedMode ? 'your list' : 'other categories'}.`}
+            </Text>
+          </View>
+          <Chip label="Search all categories instead" onPress={() => pickCategory('all')} />
+        </View>
+      )}
       {drafts.new && (
         // An unfinished new recommendation: closed before it was added.
         <Pressable onPress={() => setAdding({ title: String(drafts.new.fields.title ?? '') })} accessibilityRole="button"
@@ -171,7 +220,17 @@ export default function ListScreen() {
       )}
       {!wide && <CategoryPicker {...tabProps} />}
 
-      {upNextMode ? (
+      {deletedMode ? (
+        <View style={[styles.chips, { alignItems: 'center' }]}>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Muted>
+              {`What you deleted stays here for ${DELETED_DAYS} days, then it's erased for good. Restore something to put it back on your list.`}
+            </Muted>
+          </View>
+          {deleted.length > 0 && <Chip label="Erase all now" color={colors.danger} onPress={() => void eraseAll()} />}
+          <SyncChip />
+        </View>
+      ) : upNextMode ? (
         <View style={[styles.chips, { alignItems: 'center' }]}>
           <View style={{ flex: 1, minWidth: 200 }}>
             <Muted>
@@ -191,18 +250,18 @@ export default function ListScreen() {
         <SyncChip />
       </View>
       )}
-      {!query && !upNextMode && items.length > 1 && (
+      {!query && !upNextMode && !deletedMode && items.length > 1 && (
         <View style={[styles.chips, { alignItems: 'center' }]}>
           <Muted>Sort</Muted>
           {SORTS.map(([s, label]) => <Chip key={s} label={label} selected={sort === s} onPress={() => { setSort(s); setRearranging(false); }} />)}
           {sort === 'manual' && (
             <Chip label={rearranging ? '✓ Done' : '↕ Rearrange'} selected={rearranging} color={colors.warm}
-              onPress={() => setRearranging(!rearranging)} />
+              onPress={() => { setRearranging(!rearranging); setRearrangeCount(REARRANGE_PAGE); }} />
           )}
         </View>
       )}
 
-      {query.trim() !== '' && (
+      {query.trim() !== '' && !deletedMode && (
         <Pressable onPress={startAdd} accessibilityRole="button"
           style={({ pressed }) => ({ backgroundColor: colors.accent, borderRadius: radius, padding: space.md, opacity: pressed ? 0.8 : 1 })}>
           <Text style={{ color: colors.bg, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>
@@ -223,19 +282,26 @@ export default function ListScreen() {
             <CategoryTabs {...tabProps} />
           </ScrollView>
         )}
-        {(upNextMode || (sort === 'manual' && rearranging)) && !query ? (
+        {(upNextMode || (sort === 'manual' && listRearranging && !deletedMode)) && !query ? (
           // Priority, and "My order" while rearranging: drag ≡ to put in order. Not a FlatList (the rows
           // move while you drag), so every row is drawn: fine for these, too slow as the everyday view
           // of a long list.
           <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled"
             contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}>
             {header}
-            <SortableList data={upNextMode ? queue : shown} keyOf={(i) => i.uid} label="recommendation" wholeRow={!upNextMode}
+            <SortableList data={upNextMode ? queue : shown.slice(0, rearrangeCount)} keyOf={(i) => i.uid} label="recommendation" wholeRow={!upNextMode}
               onReorder={(next) => (upNextMode ? store.upNext.reorder : store.items.reorder)(next.map((i) => i.uid))
                 .catch((e) => setToast({ text: (e as Error).message }))}
               renderRow={(item) => (
                 <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected} onPress={onPress} flush hasDraft={!!drafts[item.uid]} />
               )} />
+            {!upNextMode && shown.length > rearrangeCount && (
+              <View style={{ paddingVertical: space.md, gap: space.sm, alignItems: 'center' }}>
+                <Muted>Showing the top {rearrangeCount} of {shown.length} to rearrange.</Muted>
+                <Chip label={`Show ${Math.min(REARRANGE_PAGE, shown.length - rearrangeCount)} more`}
+                  onPress={() => setRearrangeCount((c) => c + REARRANGE_PAGE)} />
+              </View>
+            )}
             {!upNextMode && shown.length === 0 && loaded && (
               <View style={{ padding: space.xl, alignItems: 'center' }}>
                 <Muted>{items.length ? 'Nothing here yet.' : 'Type a title in the box above and press Enter to add your first recommendation.'}</Muted>
@@ -245,17 +311,23 @@ export default function ListScreen() {
         ) : (
         <FlatList
           style={{ flex: 1 }}
-          data={shown}
-          extraData={drafts}
+          data={deletedMode ? deletedShown : shown}
+          extraData={[drafts, deletedMode]}
           keyExtractor={(i) => i.uid}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}
           ListHeaderComponent={header}
-          renderItem={({ item }) => (
+          renderItem={({ item }) => deletedMode ? (
+            <DeletedRow item={item} category={anyCategory.get(item.categoryUid)} onRestore={onRestore} />
+          ) : (
             <ItemRow item={item} category={byUid.get(item.categoryUid)} showCategory={!selected}
               onPress={onPress} hasDraft={!!drafts[item.uid]} />
           )}
-          ListEmptyComponent={!loaded ? undefined : (
+          ListEmptyComponent={!loaded ? undefined : deletedMode ? (
+            <View style={{ padding: space.xl, alignItems: 'center' }}>
+              <Muted>{query ? 'Nothing deleted matches.' : `Nothing deleted in the last ${DELETED_DAYS} days.`}</Muted>
+            </View>
+          ) : (
             <View style={{ padding: space.xl, gap: space.sm, alignItems: 'center' }}>
               <Text style={{ color: colors.text, fontSize: 17, textAlign: 'center' }}>
                 {query ? 'Nothing matches yet.' : items.length ? 'Nothing here yet.' : 'Your list is empty.'}

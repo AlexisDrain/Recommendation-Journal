@@ -7,17 +7,17 @@ import type { Category } from '@/lib/types';
 
 interface Props {
   categories: Category[];
-  /** Items per category uid, 'all' for the total and 'upnext' for Priority. */
+  /** Items per category uid, 'all' for the total, 'upnext' for Priority and 'deleted' for Recently deleted. */
   counts: Map<string, number>;
   selected: string | 'all';
   onSelect: (uid: string | 'all') => void;
   onNew: () => void;
-  /** Leave out "Priority" and "+ New category" (the Sheet tab: All and the categories). */
+  /** Leave out "Priority", "+ New category" and "Recently deleted" (the Sheet tab: All and the categories). */
   plain?: boolean;
 }
 
-function Tab({ label, count, selected, onPress, color = colors.text }: {
-  label: string; count?: number; selected?: boolean; onPress: () => void; color?: string;
+function Tab({ label, icon, iconColor, count, selected, onPress, color = colors.text }: {
+  label: string; icon?: string; iconColor?: string; count?: number; selected?: boolean; onPress: () => void; color?: string;
 }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected }}
@@ -28,6 +28,7 @@ function Tab({ label, count, selected, onPress, color = colors.text }: {
         backgroundColor: selected ? colors.chip : pressed || hovered ? colors.card : 'transparent',
       })}>
       <Text style={{ flex: 1, color: selected ? colors.text : color, fontSize: 15, fontWeight: selected ? '700' : '400' }} numberOfLines={1}>
+        {icon && <Text style={{ color: iconColor ?? color }}>{icon} </Text>}
         {label}
       </Text>
       {count !== undefined && <Text style={{ color: colors.muted, fontSize: 13 }}>{count}</Text>}
@@ -38,12 +39,19 @@ function Tab({ label, count, selected, onPress, color = colors.text }: {
 export function CategoryTabs({ categories, counts, selected, onSelect, onNew, plain }: Props) {
   return (
     <View accessibilityRole="tablist" style={{ gap: 2 }}>
-      {!plain && <Tab label="★ Priority" count={counts.get('upnext') ?? 0} selected={selected === 'upnext'} onPress={() => onSelect('upnext')} color={colors.warm} />}
       <Tab label="All" count={counts.get('all') ?? 0} selected={selected === 'all'} onPress={() => onSelect('all')} />
+      {!plain && <Tab label="Priority" icon="★" iconColor={colors.warm} count={counts.get('upnext') ?? 0} selected={selected === 'upnext'} onPress={() => onSelect('upnext')} />}
       {categories.map((c) => (
         <Tab key={c.uid} label={c.name} count={counts.get(c.uid) ?? 0} selected={selected === c.uid} onPress={() => onSelect(c.uid)} />
       ))}
       {!plain && <Tab label="+ New category" color={colors.warm} onPress={onNew} />}
+      {/* Always last, a little apart: not a category of its own, just what you deleted lately. */}
+      {!plain && (
+        <View style={{ marginTop: space.sm, borderTopWidth: 1, borderTopColor: colors.cardBorder, paddingTop: space.sm }}>
+          <Tab label="🗑 Recently deleted" count={counts.get('deleted') ?? 0} selected={selected === 'deleted'}
+            onPress={() => onSelect('deleted')} color={colors.muted} />
+        </View>
+      )}
     </View>
   );
 }
@@ -61,7 +69,7 @@ export function CategoryPicker(props: Props) {
         }}>
         <Text style={{ color: colors.muted, fontSize: 15 }}>Category</Text>
         <Text style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
-          {current?.name ?? (props.selected === 'upnext' ? '★ Priority' : 'All')}
+          {current?.name ?? (props.selected === 'upnext' ? '★ Priority' : props.selected === 'deleted' ? '🗑 Recently deleted' : 'All')}
         </Text>
         <Text style={{ color: colors.muted, fontSize: 13 }}>{props.counts.get(current?.uid ?? props.selected) ?? 0}</Text>
         <Text style={{ color: colors.muted, fontSize: 14 }}>{open ? '▴' : '▾'}</Text>

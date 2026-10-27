@@ -13,7 +13,7 @@ import { stamp } from '@/lib/dates';
 import { secureStorage } from '@/lib/secureStorage';
 import type { Category } from '@/lib/types';
 import { itemCells, mapHeader, ORDER_COLUMN, rowFields } from './rowFormat';
-import { allCategories, allItems, getDb, onLocalChange, reload, writeCategory, writeItem } from './store';
+import { allCategories, allItems, DELETED_DAYS, getData, getDb, onLocalChange, reload, store, writeCategory, writeItem } from './store';
 import { transaction } from './transaction';
 
 const CONNECTION_KEY = 'recjournal.sheetConnection';
@@ -267,6 +267,9 @@ async function runSync() {
       await reload();
       pulledListeners.forEach((fn) => fn());
     }
+    // Each item carries its own Priority number, so two devices' numbering can mix into two #1s
+    // or a gap. Number them 1, 2, 3… again, and send that in another round.
+    if (await store.upNext.tidy()) again = true;
     return { pushed: changed.length, pulled };
   } catch (e) {
     await saveState({ ...state, lastError: (e as Error).message });
@@ -309,6 +312,8 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
       count++;
     }
 
+    /** When each item written by this pull was last changed: a deletion older than that lost to it. */
+    const written = new Map<string, string>();
     for (const r of answer.items ?? []) {
       const mine = items.get(r.id);
       if (mine && mine.updatedAt >= r.updated) continue; // this device's version is as new or newer
@@ -318,11 +323,13 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
       await writeItem(tx, { uid: r.id, categoryUid: r.category, deleted: false, updatedAt: r.updated, ...fields, author: fields.author ?? mine?.author ?? '',
         queuePos: fields.queuePos !== undefined ? fields.queuePos : mine?.queuePos ?? null,
         manualPos: fields.manualPos ?? null });
+      written.set(r.id, r.updated);
       count++;
     }
     for (const d of answer.deleted ?? []) {
       const mine = items.get(d.id);
-      if (!mine || mine.deleted || mine.updatedAt > d.updated) continue;
+      // Restored after it was deleted (the sheet keeps the old deletion in its log): stays restored.
+      if (!mine || mine.deleted || mine.updatedAt > d.updated || (written.get(d.id) ?? '') > d.updated) continue;
       await tx.runAsync(`UPDATE items SET deleted = 1, updated_at = ? WHERE uid = ?`, d.updated, d.id);
       count++;
     }
@@ -337,8 +344,38 @@ export function requestSync(delayMs = 3000) {
   if (timer) clearTimeout(timer);
   timer = setTimeout(async () => {
     timer = null;
+    await eraseOldDeleted().catch(() => {});
     if (await getConnection()) syncNow().catch(() => {});
   }, delayMs);
+}
+
+/**
+ * Erases what was deleted more than DELETED_DAYS ago. With a sheet connected, only deletions the
+ * sheet has already been sent: until then it's what tells your other devices to delete it too.
+ */
+/**
+ * "Erase all": everything in Recently deleted, now. With a sheet connected it syncs first, so the
+ * sheet (and through it your other devices) still hears about each deletion; anything that sync
+ * couldn't send is kept. Returns how many are still there.
+ */
+export async function eraseAllDeleted(): Promise<number> {
+  let before = '~'; // sorts after every time stamp: everything
+  if (await getConnection()) {
+    await syncNow().catch(() => {});
+    const sent = (await getSyncState()).lastPushed;
+    before = sent ? `${sent}~` : ''; // up to and including the last one sent
+  }
+  if (before) await store.items.eraseDeleted(before);
+  return getData().deleted.length;
+}
+
+async function eraseOldDeleted() {
+  let before = new Date(Date.now() - DELETED_DAYS * 86_400_000).toISOString().slice(0, 19) + 'Z';
+  if (await getConnection()) {
+    const sent = (await getSyncState()).lastPushed;
+    if (sent < before) before = sent;
+  }
+  if (before) await store.items.eraseDeleted(before);
 }
 
 // Every change made in the app goes to the sheet a few seconds later.
