@@ -160,9 +160,8 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
   const n = () => ++section; // sections are numbered as they're drawn, so a hidden one leaves no gap
 
   return (
-    <>
     <ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled"
-      style={{ flexShrink: 1, flexGrow: 0 }} contentContainerStyle={{ gap: space.md }}>
+      contentContainerStyle={{ gap: space.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: space.md }}>
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', flex: 1 }}>
           {item ? 'Edit' : `Add ${withArticle(category?.noun || 'recommendation')}`}
@@ -246,9 +245,6 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       )}
 
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
-    </ScrollView>
-    {/* Pinned below the scrolling part: always in sight, just above the keyboard while typing. */}
-    <View style={{ gap: space.sm }}>
       {/* Unsaved changes (just made, or a draft kept from before): throw them away. */}
       {changed && (
         <Button title="Discard changes" onPress={discard} small color={colors.chip} textColor={colors.warm} />
@@ -263,8 +259,7 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
           </View>
         )}
       </View>
-    </View>
-    </>
+    </ScrollView>
   );
 }
 

@@ -75,9 +75,8 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
   };
 
   return (
-    <>
     <ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled"
-      style={{ flexShrink: 1, flexGrow: 0 }} contentContainerStyle={{ gap: space.md }}>
+      contentContainerStyle={{ gap: space.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: space.md }}>
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{category ? 'Edit category' : 'New category'}</Text>
         <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
@@ -93,18 +92,16 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
       )}
       {category && <Muted>Hidden categories are left off the list and the add screen. Their recommendations are kept.</Muted>}
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
-    </ScrollView>
-    {/* Pinned below the scrolling part: always in sight, just above the keyboard while typing. */}
-    <View style={{ flexDirection: 'row', gap: space.sm }}>
-      <View style={{ flex: 1 }}>
-        <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
-      </View>
-      {category && (
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
         <View style={{ flex: 1 }}>
-          <Button title="Delete" onPress={remove} color={colors.danger} />
+          <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
         </View>
-      )}
-    </View>
-    </>
+        {category && (
+          <View style={{ flex: 1 }}>
+            <Button title="Delete" onPress={remove} color={colors.danger} />
+          </View>
+        )}
+      </View>
+    </ScrollView>
   );
 }
