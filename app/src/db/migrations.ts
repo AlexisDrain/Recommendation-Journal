@@ -13,6 +13,16 @@ import { transaction } from './transaction';
 
 const quote = (s: string) => `'${s.replaceAll("'", "''")}'`;
 
+/**
+ * Migration 10: the fields a sync sends, by their names in the app's code (kept in `items.unsynced`)
+ * and their columns. Part of a shipped migration, so frozen: a field added later needs a new one.
+ */
+const UNSYNCED_FIELDS: [string, string][] = [
+  ['categoryUid', 'category_uid'], ['title', 'title'], ['author', 'author'], ['status', 'status'], ['rating', 'rating'],
+  ['recommendedBy', 'recommended_by'], ['note', 'note'], ['recommendedOn', 'recommended_on'], ['doneOn', 'done_on'],
+  ['queuePos', 'queue_pos'], ['manualPos', 'manual_pos'], ['deleted', 'deleted'],
+];
+
 export const MIGRATIONS: string[] = [
   // 1 — initial schema
   `
@@ -134,6 +144,28 @@ export const MIGRATIONS: string[] = [
   // Starts empty: things done before keep their place (by when they were added).
   `
   ALTER TABLE items ADD COLUMN done_at TEXT;
+  `,
+
+  // 10 — which fields of a recommendation were changed on this device and haven't reached the
+  // Google Sheet yet ("rating note"), so a sync keeps them and takes every other field from the
+  // sheet: two devices that each changed a different field of the same thing both keep their change.
+  // A trigger keeps the list for every write made here; the sync puts it back after writing what
+  // came from the sheet, and empties it once the change has been sent.
+  `
+  ALTER TABLE items ADD COLUMN unsynced TEXT NOT NULL DEFAULT '';
+  CREATE TRIGGER items_unsynced AFTER UPDATE ON items WHEN NEW.unsynced = OLD.unsynced
+  BEGIN
+    UPDATE items SET unsynced = trim(OLD.unsynced
+      ${UNSYNCED_FIELDS.map(([field, column]) =>
+        `|| CASE WHEN NEW.${column} IS NOT OLD.${column} AND instr(' ' || OLD.unsynced || ' ', ' ${field} ') = 0 THEN ' ${field}' ELSE '' END`).join(' ')})
+    WHERE id = NEW.id;
+  END;
+  -- Something new made here: all of it still has to reach the sheet. (A sync can't go by time
+  -- alone: what it merges is given a time after the sheet's, which can be ahead of this clock.)
+  CREATE TRIGGER items_unsynced_new AFTER INSERT ON items
+  BEGIN
+    UPDATE items SET unsynced = '${UNSYNCED_FIELDS.map(([field]) => field).join(' ')}' WHERE id = NEW.id;
+  END;
   `,
 ];
 

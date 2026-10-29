@@ -357,6 +357,20 @@ export async function writeItem(tx: SQLite.SQLiteDatabase, it: Omit<Item, 'id' |
   );
 }
 
+/**
+ * Per item: the fields changed on this device that the Google Sheet doesn't have yet, as stored
+ * ("rating note"). A trigger keeps this up to date on every write (migration 10).
+ */
+export async function unsyncedFields(): Promise<Map<string, string>> {
+  const rows = await (await getDb()).getAllAsync<{ uid: string; unsynced: string }>(`SELECT uid, unsynced FROM items WHERE unsynced <> ''`);
+  return new Map(rows.map((r) => [r.uid, r.unsynced]));
+}
+
+/** The item reached the sheet as it was then. (Not if it was changed again meanwhile.) */
+export async function markSynced(uid: string, updatedAt: string, unsynced: string) {
+  await (await getDb()).runAsync(`UPDATE items SET unsynced = '' WHERE uid = ? AND updated_at = ? AND unsynced = ?`, uid, updatedAt, unsynced);
+}
+
 // ---------- categories ----------
 
 /** The category with this name (ignoring case, spaces and punctuation), if there is one. */

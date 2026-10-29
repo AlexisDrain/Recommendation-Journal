@@ -33,6 +33,9 @@ npx expo start        # scan the QR code with the phone; press w for the web ver
 
 For the web version alone: `npx expo start --web --port 8081 < /dev/null`.
 
+`npm test` runs the tests in `app/tests`: the sync between two devices, end to end, with the real
+sheet script running against an in-memory spreadsheet (`tests/stubs/sheet-script.cjs`).
+
 ## How the data works
 
 - **One SQLite file on the device** (`recommendations.db`; in a browser, SQLite compiled to
@@ -58,13 +61,25 @@ For the web version alone: `npx expo start --web --port 8081 < /dev/null`.
 
 ## How the sync works
 
-One `sync` request per sync ([`sync.ts`](app/src/db/sync.ts) ↔
-[`RecommendationJournalSync.gs`](google-sheets/RecommendationJournalSync.gs)): the app sends all
-its categories and the items changed since the last sync; the script merges them (newest
-`Updated` wins), keeps one tab per category, and sends back the categories and every row whose
-hidden **Changed** column (the sheet's own clock) is at or after the app's last pull. Using the
-sheet's clock for "what's new" means a device that syncs late never makes another device miss its
-edits. A category made on two devices before they first synced is merged by name (`aliases`).
+The script has one `sync` action ([`sync.ts`](app/src/db/sync.ts) ↔
+[`RecommendationJournalSync.gs`](google-sheets/RecommendationJournalSync.gs)): it takes the app's
+categories and changed items, writes the newer copy of each row (by `Updated`), keeps one tab per
+category, and (with `pull`) sends back the categories and every row whose hidden **Changed**
+column (the sheet's own clock) is at or after the app's last pull. Using the sheet's clock for
+"what's new" means a device that syncs late never makes another device miss its edits. A category
+made on two devices before they first synced is merged by name (`aliases`).
+
+The app calls it twice per sync, **receive first, then send**, so it can merge **field by field**:
+- `items.unsynced` lists the fields changed on this device and not sent yet (`rating note`). A
+  trigger keeps it for every write (migration 10); the sync puts it back after writing what came
+  from the sheet, and empties it once the item was sent (only if it wasn't changed meanwhile).
+- A row from the sheet replaces the item except those fields. If any are left, the item gets a
+  time a second after the sheet's, so it wins when sent. Two devices that each changed a different
+  field of the same item both keep their change, whichever saved last.
+- A deletion from another device beats edits made here to other fields (they're kept, for Recently
+  deleted), but not a restore made here that wasn't sent yet.
+- The Priority renumbering after a sync marks only `queuePos`, and only on items whose number changed.
+- Tested end to end in `app/tests/sync-merge.test.mts` (`npm test`).
 
 Saving never waits for the sheet: changes are saved on the device, and the sync follows a few
 seconds later in the background (a change made during a sync goes out right after it). A failed

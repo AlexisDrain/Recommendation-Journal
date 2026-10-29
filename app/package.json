@@ -34,6 +34,7 @@
     "@types/react": "~19.3.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -45,7 +46,8 @@
     "lint": "expo lint",
     "release": "node scripts/release.js",
     "release:web": "node scripts/release.js web",
-    "release:phone": "node scripts/release.js phone"
+    "release:phone": "node scripts/release.js phone",
+    "test": "node --import tsx --import ./tests/hooks.mjs --test \"tests/*.test.mts\""
   },
   "private": true,
   "license": "MIT"

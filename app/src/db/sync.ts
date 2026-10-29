@@ -11,9 +11,9 @@ import { useSyncExternalStore } from 'react';
 import { suggestWords } from '@/lib/categories';
 import { stamp } from '@/lib/dates';
 import { secureStorage } from '@/lib/secureStorage';
-import type { Category } from '@/lib/types';
+import type { Category, Item } from '@/lib/types';
 import { itemCells, mapHeader, ORDER_COLUMN, rowFields } from './rowFormat';
-import { allCategories, allItems, DELETED_DAYS, getData, getDb, onLocalChange, reload, store, writeCategory, writeItem } from './store';
+import { allCategories, allItems, DELETED_DAYS, getData, getDb, markSynced, onLocalChange, reload, store, unsyncedFields, writeCategory, writeItem } from './store';
 import { transaction } from './transaction';
 
 const CONNECTION_KEY = 'recjournal.sheetConnection';
@@ -235,32 +235,43 @@ async function runSync() {
   if (!conn) throw new Error('Not connected to a Google Sheet.');
   const state = await getSyncState();
   try {
+    // 1. Receive first (a sync request that sends no recommendations), and merge it in field by
+    // field: a field changed here and not sent yet keeps this device's value, every other field
+    // takes the sheet's. So two devices that each changed a different field of the same thing (the
+    // rating on one, the note on the other) both keep their change, whichever saved last.
+    const answer = await call<SyncAnswer>(conn, 'sync', {
+      categories: (await allCategories()).map(toSheetCategory),
+      items: [],
+      since: state.lastPulled,
+      pull: true,
+      full: !lookedAtEverything,
+    });
+    const pulled = await applyAnswer(answer);
+
+    // 2. Send what changed here (now including what was just merged in): newer than the last
+    // send, or with fields the sheet doesn't have yet. Big first syncs go in batches.
     const categories = await allCategories();
     const byUid = new Map(categories.map((c) => [c.uid, c]));
-    const changed = (await allItems()).filter((i) => i.updatedAt > state.lastPushed);
-    const sent = changed.map((i) => ({
-      id: i.uid, category: i.categoryUid, deleted: i.deleted, updated: i.updatedAt,
-      values: i.deleted ? {} : withOldNames(itemCells(i, byUid.get(i.categoryUid)), String(i.manualPos)),
-    }));
-
-    // Big first syncs go in batches; the last request also brings back the sheet's changes.
-    let answer: SyncAnswer | null = null;
-    for (let i = 0; i === 0 || i < sent.length; i += PUSH_BATCH) {
-      const last = i + PUSH_BATCH >= sent.length;
-      answer = await call<SyncAnswer>(conn, 'sync', {
+    const sentWith = await unsyncedFields();
+    const changed = (await allItems()).filter((i) => i.updatedAt > state.lastPushed || sentWith.has(i.uid));
+    for (let i = 0; i < changed.length; i += PUSH_BATCH) {
+      const batch = changed.slice(i, i + PUSH_BATCH);
+      await call<SyncAnswer>(conn, 'sync', {
         categories: categories.map(toSheetCategory),
-        items: sent.slice(i, i + PUSH_BATCH),
-        since: state.lastPulled,
-        pull: last,
-        full: !lookedAtEverything,
+        items: batch.map((it) => ({
+          id: it.uid, category: it.categoryUid, deleted: it.deleted, updated: it.updatedAt,
+          values: it.deleted ? {} : withOldNames(itemCells(it, byUid.get(it.categoryUid)), String(it.manualPos)),
+        })),
+        pull: false,
       });
+      // Sent: these fields are the sheet's now too. (An edit made during the sync keeps its list.)
+      for (const it of batch) if (sentWith.has(it.uid)) await markSynced(it.uid, it.updatedAt, sentWith.get(it.uid)!);
     }
-    const pulled = await applyAnswer(answer!);
     if (changed.length) state.lastPushed = changed.reduce((max, i) => (i.updatedAt > max ? i.updatedAt : max), state.lastPushed);
-    if (answer!.now) state.lastPulled = answer!.now;
-    state.scriptVersion = answer!.version ?? 1;
-    if (answer!.sheet) state.sheetName = answer!.sheet; // the sheet may have been renamed
-    state.sheetUrl = sheetAddress(answer!.url) ?? state.sheetUrl;
+    if (answer.now) state.lastPulled = answer.now;
+    state.scriptVersion = answer.version ?? 1;
+    if (answer.sheet) state.sheetName = answer.sheet; // the sheet may have been renamed
+    state.sheetUrl = sheetAddress(answer.url) ?? state.sheetUrl;
     await saveState({ ...state, lastSyncAt: new Date().toISOString(), lastError: null });
     lookedAtEverything = true;
     if (pulled) {
@@ -283,6 +294,8 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
   // Read first: on phones the transaction is exclusive, so only `tx` may be used inside it.
   const local = new Map((await allCategories()).map((c) => [c.uid, c]));
   const items = new Map((await allItems()).map((i) => [i.uid, i]));
+  const unsynced = await unsyncedFields();
+  const keepOf = (uid: string) => new Set((unsynced.get(uid) ?? '').split(' ').filter(Boolean));
   let count = 0;
   await transaction(db, async (tx) => {
     // A category this device made has the same name as one already in the sheet: become that one.
@@ -316,29 +329,60 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
     const written = new Map<string, string>();
     for (const r of answer.items ?? []) {
       const mine = items.get(r.id);
-      if (mine && mine.updatedAt >= r.updated) continue; // this device's version is as new or newer
+      const keep = keepOf(r.id);
+      // Times are kept to the second, so the same time counts as the sheet's copy being newer.
+      const theirsNewer = !mine || r.updated > mine.updatedAt || (r.updated === mine.updatedAt && keep.size > 0);
+      if (mine && !theirsNewer && !keep.size) continue; // this device's copy is as new or newer, and complete
       const header = Object.keys(r.cells);
       const fields = rowFields(mapHeader(header), header.map((h) => r.cells[h]), local.get(r.category), false);
       if (!fields) continue;
-      await writeItem(tx, { uid: r.id, categoryUid: r.category, deleted: false, updatedAt: r.updated, ...fields, author: fields.author ?? mine?.author ?? '',
+      const merged = mergeItem(mine, {
+        categoryUid: r.category, deleted: false, ...fields, author: fields.author ?? mine?.author ?? '',
         queuePos: fields.queuePos !== undefined ? fields.queuePos : mine?.queuePos ?? null,
-        manualPos: fields.manualPos ?? null });
+        manualPos: fields.manualPos ?? mine?.manualPos ?? null,
+      }, keep);
+      // The sheet's time, unless this copy is newer, or fields changed here still have to go out:
+      // then later than the sheet's, so they win when sent.
+      const at = !mine ? r.updated : !theirsNewer ? mine.updatedAt : keep.size ? laterThan(r.updated) : r.updated;
+      await writeItem(tx, { uid: r.id, ...merged, updatedAt: at });
+      // Merging isn't an edit made here: the trigger's list goes back to what it was.
+      await tx.runAsync(`UPDATE items SET unsynced = ? WHERE uid = ?`, unsynced.get(r.id) ?? '', r.id);
       written.set(r.id, r.updated);
       // Marked done (or back on the list) on another device: "Newest" follows, as it does here.
-      if (fields.status === 'done' && mine?.status !== 'done') await tx.runAsync(`UPDATE items SET done_at = ? WHERE uid = ?`, r.updated, r.id);
-      if (fields.status === 'want' && mine?.status === 'done') await tx.runAsync(`UPDATE items SET done_at = NULL WHERE uid = ?`, r.id);
+      if (merged.status === 'done' && mine?.status !== 'done') await tx.runAsync(`UPDATE items SET done_at = ? WHERE uid = ?`, r.updated, r.id);
+      if (merged.status === 'want' && mine?.status === 'done') await tx.runAsync(`UPDATE items SET done_at = NULL WHERE uid = ?`, r.id);
       count++;
     }
+    // Deleted on another device. A deletion beats edits made here to other fields that haven't been
+    // sent (they're kept, for Recently deleted), but not a restore made here that hasn't been sent.
     for (const d of answer.deleted ?? []) {
       const mine = items.get(d.id);
-      // Restored after it was deleted (the sheet keeps the old deletion in its log): stays restored.
-      if (!mine || mine.deleted || mine.updatedAt > d.updated || (written.get(d.id) ?? '') > d.updated) continue;
+      if (!mine || mine.deleted) continue;
+      const keep = keepOf(d.id);
+      if (keep.has('deleted')) continue; // restored here, not sent yet
+      if ((written.get(d.id) ?? '') > d.updated) continue; // restored or changed elsewhere after it was deleted
+      if (!keep.size && mine.updatedAt > d.updated) continue; // changed here after it was deleted (and sent): the newer copy wins
       await tx.runAsync(`UPDATE items SET deleted = 1, updated_at = ? WHERE uid = ?`, d.updated, d.id);
+      await tx.runAsync(`UPDATE items SET unsynced = '' WHERE uid = ?`, d.id); // nothing of it to send any more
       count++;
     }
   });
   return count;
 }
+
+/** The fields of a recommendation that sync, as the sheet has them. */
+type SyncedFields = Omit<Item, 'id' | 'uid' | 'createdAt' | 'updatedAt' | 'doneAt' | 'manualPos'> & { manualPos: number | null };
+
+/** The sheet's copy, with this device's value for every field changed here and not sent yet. */
+export function mergeItem(mine: Item | undefined, theirs: SyncedFields, keep: Set<string>): SyncedFields {
+  if (!mine || !keep.size) return theirs;
+  const merged: Record<string, unknown> = { ...theirs };
+  for (const field of keep) if (field in merged) merged[field] = mine[field as keyof Item];
+  return merged as SyncedFields;
+}
+
+/** A second after `iso` ("2026-10-21T18:30:00Z"). */
+const laterThan = (iso: string) => new Date(Date.parse(iso) + 1000).toISOString().slice(0, 19) + 'Z';
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 
