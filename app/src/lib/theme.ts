@@ -16,6 +16,7 @@ const DARK = {
   success: '#7be0a8', // "done" items
   successBg: '#15241f',
   chip: '#232846',
+  rowAlt: '#1e2340', // every other row in the Sheet tab, to follow a row across
 };
 
 const LIGHT: typeof DARK = {
@@ -30,6 +31,7 @@ const LIGHT: typeof DARK = {
   success: '#1c8a55',
   successBg: '#e3f4ea',
   chip: '#e9ebf6',
+  rowAlt: '#f5f6fc',
 };
 
 export type ThemeName = 'dark' | 'light';

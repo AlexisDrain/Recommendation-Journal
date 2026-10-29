@@ -28,6 +28,9 @@ type Sort = 'manual' | 'newest' | 'title' | 'rating';
 const REARRANGE_PAGE = 50;
 const SORTS: [Sort, string][] = [['manual', 'My order'], ['newest', 'Newest'], ['title', 'A–Z'], ['rating', 'Best rated']];
 
+/** "Newest": when it was added, or marked done if that was later. */
+const newestKey = (i: Item) => (i.doneAt && i.doneAt > i.createdAt ? i.doneAt : i.createdAt);
+
 /** The sort you picked last (remembered on this device). "My order" starts as newest first. */
 const SORT_KEY = 'recjournal.sort.v1';
 let lastSort: Sort = 'manual';
@@ -92,6 +95,7 @@ export default function ListScreen() {
     let list = search(inCategory, categories, query).filter((i) => status === 'all' || i.status === status);
     if (!query) {
       if (sort === 'manual') list = [...list].sort((a, b) => b.manualPos - a.manualPos);
+      if (sort === 'newest') list = [...list].sort((a, b) => (newestKey(a) < newestKey(b) ? 1 : newestKey(a) > newestKey(b) ? -1 : 0));
       if (sort === 'title') list = [...list].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
       if (sort === 'rating') list = [...list].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     }

@@ -42,7 +42,7 @@ const SELECT_CATEGORY = `
 
 const SELECT_ITEM = `
   SELECT id, uid, category_uid AS categoryUid, title, author, status, rating, recommended_by AS recommendedBy, note,
-         recommended_on AS recommendedOn, done_on AS doneOn, queue_pos AS queuePos, manual_pos AS manualPos, deleted, created_at AS createdAt, updated_at AS updatedAt
+         recommended_on AS recommendedOn, done_on AS doneOn, done_at AS doneAt, queue_pos AS queuePos, manual_pos AS manualPos, deleted, created_at AS createdAt, updated_at AS updatedAt
   FROM items`;
 
 type Bools<T, K extends keyof T> = Omit<T, K> & Record<K, number>;
@@ -189,6 +189,7 @@ const ITEM_COLUMNS = {
   note: 'note',
   recommendedOn: 'recommended_on',
   doneOn: 'done_on',
+  doneAt: 'done_at',
   queuePos: 'queue_pos',
 } as const;
 
@@ -199,6 +200,9 @@ function cleanPatch(patch: ItemPatch, before?: Item): ItemPatch {
   if (p.rating && p.status === undefined && before?.status === 'want') p.status = 'done'; // rating it = you've had it
   if (p.status === 'done' && before?.status !== 'done' && p.doneOn === undefined && !before?.doneOn) p.doneOn = today();
   if (p.status === 'want' && before?.status === 'done' && p.doneOn === undefined) p.doneOn = null;
+  // Marked done just now: "Newest" puts it on top. Back on your list: back to when it was added.
+  if (p.status === 'done' && before?.status !== 'done') p.doneAt = stamp();
+  if (p.status === 'want' && before?.status === 'done') p.doneAt = null;
   if (p.status === 'done' && p.queuePos === undefined && before?.queuePos != null) p.queuePos = null; // done: no longer a priority
   return p;
 }

@@ -324,6 +324,9 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
         queuePos: fields.queuePos !== undefined ? fields.queuePos : mine?.queuePos ?? null,
         manualPos: fields.manualPos ?? null });
       written.set(r.id, r.updated);
+      // Marked done (or back on the list) on another device: "Newest" follows, as it does here.
+      if (fields.status === 'done' && mine?.status !== 'done') await tx.runAsync(`UPDATE items SET done_at = ? WHERE uid = ?`, r.updated, r.id);
+      if (fields.status === 'want' && mine?.status === 'done') await tx.runAsync(`UPDATE items SET done_at = NULL WHERE uid = ?`, r.id);
       count++;
     }
     for (const d of answer.deleted ?? []) {

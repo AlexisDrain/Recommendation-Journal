@@ -129,6 +129,12 @@ export const MIGRATIONS: string[] = [
       AND (o.queue_pos < items.queue_pos OR (o.queue_pos = items.queue_pos AND o.id <= items.id)))
   WHERE deleted = 0 AND queue_pos IS NOT NULL;
   `,
+
+  // 9 — when something was marked done (a time), so "Newest" shows what you just finished on top.
+  // Starts empty: things done before keep their place (by when they were added).
+  `
+  ALTER TABLE items ADD COLUMN done_at TEXT;
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase) {

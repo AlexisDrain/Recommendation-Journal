@@ -45,6 +45,8 @@ export interface Item {
   recommendedOn: string | null;
   /** When you watched / read / played it. */
   doneOn: string | null;
+  /** When it was marked done (a time, on this device), so "Newest" can show it on top. Not synced. */
+  doneAt?: string | null;
   /** Its place in "Priority" (1 = first), or null when it isn't on it. */
   queuePos: number | null;
   /** Its place in "My order": higher comes first. */
@@ -54,5 +56,5 @@ export interface Item {
   updatedAt: string;
 }
 
-export type ItemPatch = Partial<Pick<Item, 'categoryUid' | 'title' | 'author' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn' | 'queuePos'>>;
+export type ItemPatch = Partial<Pick<Item, 'categoryUid' | 'title' | 'author' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn' | 'doneAt' | 'queuePos'>>;
 export type CategoryPatch = Partial<Pick<Category, 'name' | 'noun' | 'wantLabel' | 'doneLabel' | 'hidden'>>;

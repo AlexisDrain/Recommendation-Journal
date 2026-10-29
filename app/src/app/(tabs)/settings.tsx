@@ -6,12 +6,13 @@ import { exportCsv, exportXlsx, pickAndImport } from '@/db/exchange';
 import { requestSync } from '@/db/sync';
 import buildInfo from '@/lib/buildInfo.json';
 import { DAY_ENDS, DAY_STARTS, setDisplayMode, useDisplayMode, useThemeName, type DisplayMode } from '@/lib/displayMode';
-import { REPO_URL } from '@/lib/links';
+import { REPO_URL, SUPPORT_EMAIL } from '@/lib/links';
 import { colors } from '@/lib/theme';
 import { NARROW_PAGE, page } from '@/lib/useLayout';
 import { setWelcomeSeen } from '@/lib/welcome';
 
 const DISPLAY_MODES: [DisplayMode, string][] = [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Light by day, dark at night']];
+const SUPPORT_MAIL = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Recommendation Journal feedback (build ${buildInfo.build})`)}`;
 const hour = (h: number) => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
 
 export default function SettingsScreen() {
@@ -68,19 +69,20 @@ export default function SettingsScreen() {
       <Card title="Your data">
         <Muted>Everything is stored only on this device.</Muted>
         <Muted>
-          Export as a spreadsheet (.xlsx) with one tab per category, for Google Sheets / Excel, or as one CSV
+          Export as a spreadsheet (.xlsx) with one tab per category, for Google Sheets / Excel, or as one .csv
           file for backups and moving to a new device.
         </Muted>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <View style={{ flex: 1 }}><Button title="Export .xlsx" onPress={() => run('xlsx', exportXlsx)} busy={busy === 'xlsx'} small /></View>
-          <View style={{ flex: 1 }}><Button title="Export CSV" onPress={() => run('csv', exportCsv)} busy={busy === 'csv'} small /></View>
+        {/* Side by side when there's room, one above the other on a phone. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <View style={{ flexGrow: 1, flexBasis: 220 }}><Button title="Export .xlsx (recommended)" onPress={() => run('xlsx', exportXlsx)} busy={busy === 'xlsx'} small /></View>
+          <View style={{ flexGrow: 1, flexBasis: 220 }}><Button title="Export .csv" onPress={() => run('csv', exportCsv)} busy={busy === 'csv'} small /></View>
         </View>
         <Muted>
-          Import an .xlsx or CSV: an export from this app, or your own list. Columns are found by name (Title or
+          Import an .xlsx or .csv: an export from this app, or your own list. Columns are found by name (Title or
           Name, Status, Rating, Recommended by, Why or Notes…), each tab becomes a category, and things already on
           your list are skipped.
         </Muted>
-        <Button title="Import .xlsx or CSV" onPress={importFile} busy={busy === 'import'} small color={colors.chip} textColor={colors.text} />
+        <Button title="Import .xlsx or .csv" onPress={importFile} busy={busy === 'import'} small color={colors.chip} textColor={colors.text} />
         {importMsg && <Text style={{ color: colors.success }}>{importMsg}</Text>}
       </Card>
 
@@ -90,6 +92,27 @@ export default function SettingsScreen() {
           color={colors.chip} textColor={colors.text} />
       </Card>
 
+      <Card title="Help">
+        <Muted>Found a problem, or have an idea for a feature?</Muted>
+        <Muted>
+          Email{' '}
+          <Text style={{ color: colors.accent, textDecorationLine: 'underline' }} accessibilityRole="link" selectable
+            onPress={() => Linking.openURL(SUPPORT_MAIL).catch(() => {})}>{SUPPORT_EMAIL}</Text>
+          {' '}with what happened. You can attach your recommendations as a spreadsheet: it helps with problems.
+          Look it over first and remove anything you’d rather keep private, like your notes.
+        </Muted>
+        <Button title="Export your recommendations to attach (.xlsx)" onPress={() => run('xlsx', exportXlsx)} busy={busy === 'xlsx'}
+          small color={colors.chip} textColor={colors.text} />
+        <Muted>
+          Or create a public issue on{' '}
+          <Text style={{ color: colors.accent, textDecorationLine: 'underline' }} accessibilityRole="link"
+            onPress={() => Linking.openURL(`${REPO_URL}/issues`).catch(() => {})}>
+            {REPO_URL.replace('https://', '')}/issues
+          </Text>
+          . Don’t attach your spreadsheet there: everyone can see it.
+        </Muted>
+      </Card>
+
       <Card title="About">
         {/* The build number goes up with every release (scripts/release.js): compare it between devices. */}
         <Text style={{ color: colors.text }} selectable>
@@ -97,12 +120,11 @@ export default function SettingsScreen() {
         </Text>
         <Muted>Published {buildInfo.date || 'from a development copy'}</Muted>
         <Muted>
-          For support and to report issues, go to{' '}
+          Project page and source code:{' '}
           <Text style={{ color: colors.accent, textDecorationLine: 'underline' }} accessibilityRole="link"
             onPress={() => Linking.openURL(REPO_URL).catch(() => {})}>
             {REPO_URL.replace('https://', '')}
           </Text>
-          .
         </Muted>
       </Card>
     </ScrollView>
