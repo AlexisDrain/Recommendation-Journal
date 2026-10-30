@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
@@ -25,12 +25,21 @@ export default function RootLayout() {
 
   if (welcomeSeen === null || !displayLoaded) return null; // reading saved settings (a few ms)
 
+  // The navigation library's own colors, from the app's: it draws things like the side rail's hover
+  // highlight (8% of `text`) with them, which its light default made invisible on the dark rail.
+  const base = theme === 'light' ? DefaultTheme : DarkTheme;
+  const navTheme: Theme = {
+    ...base,
+    colors: { ...base.colors, primary: colors.accent, background: colors.bg, card: colors.card, text: colors.text, border: colors.cardBorder },
+  };
+
   // Until the welcome is finished only the welcome screen exists; finishing it flips the guards
   // and Expo Router moves to the tabs on its own.
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
+      <ThemeProvider value={navTheme}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Protected guard={welcomeSeen}>
           <Stack.Screen name="(tabs)" />
@@ -39,6 +48,7 @@ export default function RootLayout() {
           <Stack.Screen name="welcome" />
         </Stack.Protected>
       </Stack>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }
