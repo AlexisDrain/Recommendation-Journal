@@ -1,8 +1,9 @@
 // The list. One box does both jobs: type to search everything you've saved; if it isn't there,
 // press Enter (or tap "+ Add") to add it, already filled in with what you typed.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { FlatList, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { CategoryPicker, CategoryTabs } from '@/components/CategoryTabs';
 import { CategoryEditor } from '@/components/CategoryEditor';
 import { DeletedRow } from '@/components/DeletedRow';
@@ -13,7 +14,7 @@ import { SyncChip } from '@/components/SyncChip';
 import { Toast, type ToastMessage } from '@/components/Toast';
 import { Chip, ErrorBox, Muted, styles } from '@/components/ui';
 import { DELETED_DAYS, reload, store, useData } from '@/db/store';
-import { eraseAllDeleted, syncNow, useSyncStatus } from '@/db/sync';
+import { eraseAllDeleted, getConnection, syncNow, useSyncStatus } from '@/db/sync';
 import { confirmAction } from '@/lib/confirm';
 import { withArticle } from '@/lib/categories';
 import { useThemeName } from '@/lib/displayMode';
@@ -154,6 +155,21 @@ export default function ListScreen() {
   }, []);
   const hideToast = useCallback(() => setToast(null), []);
 
+  // Pull down at the top of the list to sync (phones), when a sheet is connected. Connecting
+  // happens in Settings, so look again whenever this tab is shown. A failure shows as below.
+  const [connected, setConnected] = useState(false);
+  useFocusEffect(useCallback(() => {
+    getConnection().then((c) => setConnected(!!c), () => setConnected(false));
+  }, []));
+  const [pulling, setPulling] = useState(false);
+  const pullToSync = useCallback(() => {
+    setPulling(true);
+    syncNow().catch(() => {}).finally(() => setPulling(false));
+  }, []);
+  const pullControl = connected && Platform.OS !== 'web'
+    ? <RefreshControl refreshing={pulling} onRefresh={pullToSync} tintColor={colors.accent} colors={[colors.accent]} />
+    : undefined;
+
   // Saving never waits for the Google Sheet. If a sync fails afterwards, say so once (a new
   // problem shows again; the Sync button keeps showing it until a sync works).
   const sync = useSyncStatus();
@@ -291,6 +307,7 @@ export default function ListScreen() {
           // move while you drag), so every row is drawn: fine for these, too slow as the everyday view
           // of a long list.
           <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled"
+            refreshControl={upNextMode ? pullControl : undefined /* rearranging: a pull would fight with dragging rows */}
             contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}>
             {header}
             <SortableList data={upNextMode ? queue : shown.slice(0, rearrangeCount)} keyOf={(i) => i.uid} label="recommendation" wholeRow={!upNextMode}
@@ -317,6 +334,7 @@ export default function ListScreen() {
           style={{ flex: 1 }}
           data={deletedMode ? deletedShown : shown}
           extraData={[drafts, deletedMode]}
+          refreshControl={pullControl}
           keyExtractor={(i) => i.uid}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.scroll, !wide && page(760), { paddingBottom: 96 }]}
