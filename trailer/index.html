@@ -26,6 +26,7 @@ html, body { background: var(--sky); color: var(--text); }
 body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
 .wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
 .viewport { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; overflow: hidden; border-radius: 14px; background: var(--bg); }
+.viewport:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; background: #000; cursor: none; }
 .stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden;
   background: radial-gradient(1200px 700px at 78% -10%, #1b2150 0%, var(--bg) 55%); }
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -150,7 +151,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
 .gsheet { position: absolute; width: 380px; border-radius: 12px; overflow: hidden; background: #fff; color: #222; box-shadow: 0 24px 60px #0008; font-size: 11.5px; }
 .gsheet .hd { background: #f1f3f4; padding: 9px 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #dadce0; }
 .gsheet .hd i { width: 14px; height: 18px; border-radius: 2px; background: #2e9e5b; display: inline-block; }
-.gsheet table { border-collapse: collapse; width: 100%; }
+.gsheet table { border-collapse: collapse; width: 100%; color: #222; font: inherit; } /* tables don't inherit these here */
 .gsheet th, .gsheet td { border: 1px solid #e0e0e0; padding: 5px 7px; text-align: left; white-space: nowrap; }
 .gsheet th { background: #c9cdf5; }
 .gsheet tr.new td { transition: opacity .5s, box-shadow .4s; }
@@ -215,7 +216,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="apptitle">Recommendations</div>
               <div class="search"><span>⌕</span><span id="a-q"></span><span class="x" id="a-x"></span></div>
               <div class="pick"><span>Category</span><b>All</b><span id="a-count">3</span><span>▾</span></div>
-              <div class="addbar" id="a-addbar">+ Add “Qoosh” to Flash games</div>
+              <div class="addbar" id="a-addbar">+ Add “Qoosh” to new entry</div>
               <div class="irow gone" id="a-new">
                 <div class="t">Qoosh</div>
                 <div class="m">Flash games · Want to play · from my brother</div>
@@ -227,7 +228,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
                 <div class="irow"><div class="t">The Count of Monte Cristo</div><div class="m">by Alexandre Dumas · Fiction books · Want to read</div></div>
               </div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="toast" id="a-toast">Added “Qoosh”.<b>Undo</b></div>
             <div class="dim" id="a-dim"></div>
             <div class="panel" id="a-panel">
@@ -260,7 +261,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="apptitle">Recommendations</div>
               <div class="search"><span>⌕</span><span id="q-q"></span><span class="x" id="q-x"></span></div>
               <div class="pick"><span>Category</span><b>All</b><span>6</span><span>▾</span></div>
-              <div class="addbar" id="q-addbar">+ Add “king” to Fiction books</div>
+              <div class="addbar" id="q-addbar">+ Add “king” to new entry</div>
               <div class="irow" data-match="0"><div class="t">Qoosh</div><div class="m">Flash games · Want to play · from my brother</div></div>
               <div class="irow" data-match="1"><div class="t">The Mist</div><div class="m">by Stephen King · Fiction books · Want to read · from Sam</div><div class="n">Short and scary, read it in one sitting</div></div>
               <div class="irow" data-match="0"><div class="t">Titanic</div><div class="m">by James Cameron · Movies · Want to watch · from a stranger on the train</div></div>
@@ -268,7 +269,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="irow" data-match="0"><div class="t">Citizen Kane</div><div class="m">by Orson Welles · Movies · Want to watch</div></div>
               <div class="irow done" data-match="0"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched</div><span class="r">❤️</span></div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="tap" id="q-tap"></div>
           </div>
         </div>
@@ -288,7 +289,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
             <div class="app">
               <div class="apptitle">Recommendations</div>
               <div class="search"><span>⌕</span><span class="ph">Search, or type something new to add…</span></div>
-              <div class="pick"><span>Category</span><b style="color: var(--warm)">★ Priority</b><span>3</span><span>▾</span></div>
+              <div class="pick"><span>Category</span><b><span style="color: var(--warm)">★</span> Priority</b><span>3</span><span>▾</span></div>
               <div class="muted">What you want to get to soon. Drag ≡ to change the order; done things leave the list.</div>
               <div class="queue" id="u-queue">
                 <div class="irow" data-key="kane"><div class="t"><i class="rank"></i>Citizen Kane</div><div class="m">by Orson Welles · Movies · from my film teacher</div><span class="grip">≡</span></div>
@@ -296,7 +297,18 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
                 <div class="irow" data-key="pre"><div class="t"><i class="rank"></i>Titanic</div><div class="m">Movies · from a stranger on the train</div><div class="n" id="u-note"></div><span class="grip">≡</span></div>
               </div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
+            <div class="dim" id="u-dim"></div>
+            <div class="panel" id="u-panel">
+              <h3>Edit <em><span>×</span></em></h3>
+              <div class="field">Titanic</div>
+              <div class="field">a stranger on the train</div>
+              <div class="field tall" id="u-why"></div>
+              <div class="chips"><span class="chipx w sel">Want to watch</span><span class="chipx g">Watched</span></div>
+              <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
+              <div class="chips"><span class="chipx w sel">★ Priority #1</span></div>
+              <div class="btn" id="u-save">Save</div>
+            </div>
             <div class="tap" id="u-tap"></div>
           </div>
         </div>
@@ -321,7 +333,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="irow"><div class="t"><i>★ 2 </i>Citizen Kane</div><div class="m">by Orson Welles · Movies · Want to watch</div></div>
               <div class="irow done"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched</div><span class="r">❤️</span></div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="dim" id="d-dim"></div>
             <div class="panel" id="d-panel">
               <h3>Edit <em><span>×</span></em></h3>
@@ -359,7 +371,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="irow done"><div class="t">Titanic</div><div class="m">Movies · Watched · from a stranger on the train</div><span class="r">❤️</span></div>
               <div class="irow"><div class="t">The Mist</div><div class="m">by Stephen King · Fiction books</div></div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="tap" id="y-tap"></div>
           </div>
         </div>
@@ -379,9 +391,9 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
         <div class="browser" style="left: 710px; top: 175px; width: 520px; height: 360px">
           <div class="chrome"><i></i><i></i><i></i><span>recommendation-journal.expo.app</span></div>
           <div class="web">
-            <div class="rail"><div class="cur"><b>★</b>List</div><div><b>▦</b>Sheet</div><div><b>☰</b>Categories</div><div><b>⚙</b>Settings</div></div>
+            <div class="rail"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="cats">
-              <div class="up">★ Priority <span>2</span></div><div>All <span id="y-all">8</span></div><div>Movies <span>3</span></div><div>Fiction books <span>2</span></div><div class="cur">Flash games <span id="y-fg">2</span></div>
+              <div>All <span id="y-all">8</span></div><div><em style="font-style: normal"><span style="color: var(--warm)">★</span> Priority</em> <span>2</span></div><div>Movies <span>3</span></div><div>Fiction books <span>2</span></div><div class="cur">Flash games <span id="y-fg">2</span></div>
             </div>
             <div class="pane">
               <div class="search" style="height: 32px; font-size: 11.5px; margin-bottom: 6px"><span>⌕</span><span id="y-web-q"></span></div>
@@ -394,7 +406,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
           </div>
         </div>
         <div class="flow" style="left: 70px; top: 540px; width: 190px">Phone</div>
-        <div class="flow" style="left: 300px; top: 450px; width: 380px">Your Google Sheet · one tab per category</div>
+        <div class="flow" style="left: 300px; top: 462px; width: 380px">Your Google Sheet · one tab per category</div>
         <div class="flow" style="left: 710px; top: 548px; width: 520px">Any browser</div>
         <div class="packet" id="y-packet"></div>
         <div class="packet" id="y-packet2" style="background: var(--accent); box-shadow: 0 0 22px var(--accent)"></div>
@@ -429,24 +441,30 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
     <button id="play" type="button">Pause</button>
     <button id="restart" type="button">Restart</button>
     <button id="sound" type="button" aria-pressed="false">Sound: off</button>
+    <button id="fullscreen" type="button">Full screen</button>
     <audio id="music" src="Inspired.mp3" preload="auto"></audio>
     <div class="progress" aria-hidden="true"><i id="prog"></i></div>
     <span class="tip" id="clock">0:00 / 0:56</span>
   </div>
-  <p class="tip">To turn this into a video file: press Sound so it says on, make the window full screen, press Restart, and record it with Xbox Game Bar (Win + Alt + R), which records the sound too.</p>
+  <p class="tip">To turn this into a video file: press Sound so it says on, press Restart, press Full screen (Esc or F leaves it), and record it with Xbox Game Bar (Win + Alt + R), which records the sound too.</p>
 </div>
 
 <script>
 (() => {
   const SPLASH = 2.5;                              // the title card, before everything else
-  const BODY = 54;                               // the scenes after it
+  const BODY = 52.5;                               // the scenes after it
   const LENGTH = SPLASH + BODY;                    // seconds, then it loops
-  const SCENES = [['s-add', 0, 12], ['s-search', 12, 19.5], ['s-upnext', 19.5, 28.5], ['s-done', 28.5, 36], ['s-sync', 36, 48.5], ['s-end', 48.5, BODY]];
+  const SCENES = [['s-add', 0, 12], ['s-search', 12, 18], ['s-upnext', 18, 27], ['s-done', 27, 34.5], ['s-sync', 34.5, 47], ['s-end', 47, BODY]];
   const $ = (id) => document.getElementById(id);
   const stage = $('stage'), viewport = $('viewport');
 
-  // Scale the 1280×720 stage to the window.
-  const fit = () => { stage.style.transform = `scale(${viewport.clientWidth / 1280})`; };
+  // Scale the 1280×720 stage to fit its frame, centered (a full screen may not be 16:9).
+  let scale = 1;
+  const fit = () => {
+    const w = viewport.clientWidth, h = viewport.clientHeight;
+    scale = Math.min(w / 1280, h / 720);
+    stage.style.transform = `translate(${(w - 1280 * scale) / 2}px, ${(h - 720 * scale) / 2}px) scale(${scale})`;
+  };
   new ResizeObserver(fit).observe(viewport);
   fit();
 
@@ -468,7 +486,6 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
    * presses at `time` and lifts off. Positions are measured from the real elements.
    */
   const place = (dot, el, dx = 0, dy = 0) => {
-    const scale = viewport.clientWidth / 1280;
     const box = dot.parentElement.getBoundingClientRect(), r = el.getBoundingClientRect();
     const inner = dot.parentElement.offsetWidth / (box.width / scale); // the sync scene's phone is drawn smaller
     dot.style.left = ((r.left + r.width / 2 - box.left) / scale) * inner + dx + 'px';
@@ -485,8 +502,9 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
   const pointerAt = (ptr, t, moves) => {
     const m = [...moves].reverse().find(([at]) => t >= at - 0.6) ?? moves[0];
     ptr.classList.toggle('press', t >= m[0] - 0.08 && t < m[0] + 0.15);
-    const scale = viewport.clientWidth / 1280;
-    const box = ptr.parentElement.getBoundingClientRect(), r = m[1].getBoundingClientRect();
+    const box = ptr.parentElement.getBoundingClientRect();
+    // A target that isn't on screen right now (the Add bar before and after it shows) has no position.
+    const r = [m[1], moves[0][1]].map((el) => el.getBoundingClientRect()).find((rect) => rect.width);
     ptr.style.left = (r.left + r.width / 2 - box.left) / scale - 3 + 'px';
     ptr.style.top = (r.top + r.height / 2 - box.top) / scale - 2 + 'px';
   };
@@ -502,7 +520,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
 
   function scenes(t) {
     for (const [id, a, b] of SCENES) $(id).classList.toggle('on', t >= a && t < b);
-    $('brand').style.opacity = t >= 0 && t < 48.5 ? 1 : 0;
+    $('brand').style.opacity = t >= 0 && t < 47 ? 1 : 0;
 
     // ---- 1. Add: type "Qoosh", tap Add, fill in who and why, Add.
     const addOpen = t >= 2.8 && t < 7.6;
@@ -522,15 +540,15 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
 
     // ---- 2. Search: "king" narrows the list to Stephen King, then the search is cleared.
     const q = t - 12;
-    const query = q < 5.6 ? typed('king', q, 1.0, 1.9) : '';
-    typeInto($('q-q'), query, q < 5.6 ? q : -9, 1.0, 1.9, 'Search, or type something new to add…');
+    const query = q < 4.8 ? typed('king', q, 1.0, 1.9) : '';
+    typeInto($('q-q'), query, q < 4.8 ? q : -9, 1.0, 1.9, 'Search, or type something new to add…');
     $('q-x').textContent = query ? '×' : '';
     $('q-addbar').style.display = query.length === 4 ? 'block' : 'none';
     for (const row of document.querySelectorAll('#s-search .irow')) row.classList.toggle('gone', query.length >= 2 && row.dataset.match === '0');
-    tapAt($('q-tap'), q, [[1.0, $('q-q')], [5.6, $('q-x')]]);
+    tapAt($('q-tap'), q, [[1.0, $('q-q')], [4.8, $('q-x')]]);
 
-    // ---- 3. Priority: drag Titanic from third to first, then give it a note.
-    const u = t - 19.5;
+    // ---- 3. Priority: drag Titanic from third to first, then open it and give it a note.
+    const u = t - 18;
     const SLOT = 92;
     const dragFrom = 1.6, dragTo = 3.1;
     const k = clamp((u - dragFrom) / (dragTo - dragFrom));
@@ -550,7 +568,11 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
       row.classList.toggle('lift', key === 'pre' && u >= dragFrom - 0.2 && u < dragTo + 0.1);
       row.querySelector('.rank').textContent = `★ ${order.indexOf(key) + 1}  `;
     }
-    typeInto($('u-note'), 'Watch this weekend 🍿', u, 4.6, 6.2);
+    const noting = u >= 4.0 && u < 6.8;
+    $('u-panel').classList.toggle('open', noting);
+    $('u-dim').classList.toggle('on', noting);
+    typeInto($('u-why'), 'Watch this weekend 🍿', u, 4.7, 6.1, 'Why? What did they say about it?');
+    $('u-note').textContent = u >= 6.8 ? 'Watch this weekend 🍿' : '';
     const grip = document.querySelector('#u-queue [data-key="pre"] .grip');
     const uTap = $('u-tap');
     if (u >= dragFrom - 0.6 && u < dragTo + 0.4) {
@@ -560,11 +582,11 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
       place(uTap, grip);
     } else {
       uTap.classList.remove('drag');
-      tapAt(uTap, u, [[4.3, $('u-note').closest('.irow')]]);
+      tapAt(uTap, u, [[3.9, $('u-note').closest('.irow')], [4.5, $('u-why')], [6.6, $('u-save')]]);
     }
 
     // ---- 4. Done: open it, tap Watched, ❤️, Save. It turns green and stops being a priority.
-    const d = t - 28.5;
+    const d = t - 27;
     const editing = d >= 0.6 && d < 4.4;
     const watched = d >= 1.6, loved = d >= 2.5, saved = d >= 4.4;
     $('d-panel').classList.toggle('open', editing);
@@ -584,7 +606,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
     tapAt($('d-tap'), d, [[0.5, $('d-row')], [1.6, $('d-watched')], [2.5, love], [4.2, $('d-save')]]);
 
     // ---- 5. Sync: from the phone to the sheet's Flash games tab, then to the browser.
-    const y = t - 36;
+    const y = t - 34.5;
     const syncing = y >= 1.2 && y < 4.8, synced = y >= 4.8;
     $('y-sync').textContent = synced ? 'Synced ✓' : syncing ? 'Syncing…' : '⟳ Sync';
     $('y-sync').classList.toggle('sel', syncing);
@@ -630,6 +652,12 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
   }
   $('play').addEventListener('click', () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; });
   $('restart').addEventListener('click', () => { elapsed = 0; playing = true; $('play').textContent = 'Pause'; });
+
+  // Full screen: the video alone, with no controls or cursor. Esc or F leaves it.
+  const toggleFullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : viewport.requestFullscreen()).catch(() => {});
+  $('fullscreen').hidden = !viewport.requestFullscreen; // iPhone Safari can't do this for a page element
+  $('fullscreen').addEventListener('click', toggleFullscreen);
+  document.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'f' && viewport.requestFullscreen) toggleFullscreen(); });
 
   // The song plays from the trailer's own position, fades in at the start and out over the last 2 seconds,
   // and starts again when the trailer loops.

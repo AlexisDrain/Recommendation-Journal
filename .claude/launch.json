@@ -4,9 +4,27 @@
     {
       "name": "web",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start", "--web", "--port", "8081"],
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8081"
+      ],
       "cwd": "app",
       "port": 8081
+    },
+    {
+      "name": "trailer",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8090",
+        "--directory",
+        "trailer"
+      ],
+      "port": 8090
     }
   ]
 }

@@ -294,7 +294,7 @@ export default function ListScreen() {
         <Pressable onPress={startAdd} accessibilityRole="button"
           style={({ pressed }) => ({ backgroundColor: colors.accent, borderRadius: radius, padding: space.md, opacity: pressed ? 0.8 : 1 })}>
           <Text style={{ color: colors.bg, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>
-            + Add “{query.trim()}”{addTo ? ` to ${addTo.name}` : ''}
+            + Add “{query.trim()}”{selected ? ` to ${selected.name}` : ' to new entry'}
           </Text>
           {exists && <Text style={{ color: colors.bg, opacity: 0.8 }}>It’s already on your list (below).</Text>}
         </Pressable>
