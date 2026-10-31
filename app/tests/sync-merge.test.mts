@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { itemCells, ORDER_COLUMN } from '@/db/rowFormat';
-import { allCategories, allItems, store, unsyncedFields } from '@/db/store';
-import { connect, syncNow } from '@/db/sync';
+import { allCategories, allItems, getDb, store, unsyncedFields } from '@/db/store';
+import { connect, syncNow, waitingToSync } from '@/db/sync';
 import type { Item } from '@/lib/types';
 
 const { makeEnv } = createRequire(import.meta.url)('./stubs/sheet-script.cjs');
@@ -14,13 +14,29 @@ const env = makeEnv();
 env.ctx.setup();
 env.ctx.showConnectionCode();
 const secret = String(env.ctx.lastLog).split('\n')[1];
-(globalThis as any).fetch = async (_url: string, init: any) => ({ text: async () => env.ctx.doPost({ postData: { contents: init.body } }).text });
+/** Runs once inside the next request that sends recommendations, as if the user acted during a sync. */
+let duringSend: ((sent: { id: string; updated: string }[]) => Promise<unknown>) | null = null;
+let frozen = false; // the next request never answers, as when a phone suspends the app
+(globalThis as any).fetch = async (_url: string, init: any) => {
+  if (frozen) {
+    frozen = false;
+    return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))));
+  }
+  const { items } = JSON.parse(init.body);
+  if (duringSend && items?.length) {
+    const act = duringSend;
+    duringSend = null;
+    await act(items);
+  }
+  return { text: async () => env.ctx.doPost({ postData: { contents: init.body } }).text };
+};
 
 // The app syncs by itself 3 seconds after each change (requestSync). Off here, so each step below
-// happens in the order written, and only the test's own syncNow() calls sync.
+// happens in the order written, and only the test's own syncNow() calls sync. The 90-second limit
+// on a request is shortened.
 const realSetTimeout = globalThis.setTimeout;
 (globalThis as any).setTimeout = (fn: () => void, ms?: number, ...rest: unknown[]) =>
-  (ms === 3000 ? undefined : realSetTimeout(fn, ms, ...rest));
+  (ms === 3000 ? undefined : realSetTimeout(fn, ms === 90_000 ? 20 : ms, ...rest));
 
 /** The other device: it sends its copy of a recommendation straight to the sheet. */
 const otherDevice = async (it: Item) => {
@@ -115,4 +131,36 @@ test('deleting, against an edit of another field', async () => {
   await syncNow();
   assert.equal((await here(uid)).deleted, true);
   assert.equal(cell('Ronin', 'Title'), undefined);
+});
+
+test('an edit made during a sync reaches the sheet with no further trigger', async () => {
+  const { uid } = await store.items.create({ categoryUid: 'default-movie', title: 'Collateral' });
+  duringSend = () => store.items.update(uid, { note: 'typed during the sync' });
+  await syncNow();
+  assert.equal(cell('Collateral', 'Why'), 'typed during the sync');
+  assert.equal(await waitingToSync(), 0);
+});
+
+test('an edit in the same second as the copy being sent still reaches the sheet', async () => {
+  const { uid } = await store.items.create({ categoryUid: 'default-movie', title: 'Manhunter' });
+  // Same time and same list of fields as the copy on its way: only the value differs. The time
+  // comes from the request itself: the sync may have re-dated the row before sending it.
+  duringSend = async (sent) => {
+    await store.items.update(uid, { note: 'same second' });
+    await (await getDb()).runAsync(`UPDATE items SET updated_at = ? WHERE uid = ?`, sent.find((i) => i.id === uid)!.updated, uid);
+  };
+  await syncNow();
+  assert.equal(cell('Manhunter', 'Why'), 'same second');
+  assert.equal(await waitingToSync(), 0);
+});
+
+test('a frozen request gives up, and the next sync works', async () => {
+  const { uid } = await store.items.create({ categoryUid: 'default-movie', title: 'Thief' });
+  assert.equal(await waitingToSync(), 1, 'waiting while unsent');
+  frozen = true;
+  await assert.rejects(syncNow(), /in time/);
+  await syncNow();
+  assert.equal(cell('Thief', 'Title'), 'Thief');
+  assert.equal(await waitingToSync(), 0);
+  assert.equal((await here(uid)).deleted, false);
 });

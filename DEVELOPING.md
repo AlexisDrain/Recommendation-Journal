@@ -82,8 +82,12 @@ The app calls it twice per sync, **receive first, then send**, so it can merge *
 - Tested end to end in `app/tests/sync-merge.test.mts` (`npm test`).
 
 Saving never waits for the sheet: changes are saved on the device, and the sync follows a few
-seconds later in the background (a change made during a sync goes out right after it). A failed
-sync shows a message on the list with Retry, and "⚠ Sync failed" on the Sync button.
+seconds later in the background, or at once when the app is left. A change made during a sync goes
+out right after it. Each request gives up after 90 seconds, so a phone suspending the app mid-request
+can't block later syncs. iOS and Android may pause the app as soon as it's left, so a quick exit can
+leave a change unsent until the next open: Settings → Google Sheet then shows "1 recommendation
+waiting to sync". A failed sync shows a message on the list with Retry, and "⚠ Sync failed" on the
+Sync button.
 
 Every call into Google Sheets is slow (often 0.1 s or more), so the script keeps them few: it
 reads the tabs and its saved notes once per sync (`context_`), only redoes tab layout (columns,

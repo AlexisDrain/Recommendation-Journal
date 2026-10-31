@@ -1,8 +1,8 @@
 // Settings → Google Sheet: connect with a connection code, then sync automatically.
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
-import { connect, disconnect, getConnection, getSyncState, LATEST_SCRIPT_VERSION, syncNow, type Connection, type SyncState } from '@/db/sync';
+import { connect, disconnect, getConnection, getSyncState, LATEST_SCRIPT_VERSION, syncNow, useSyncStatus, waitingToSync, type Connection, type SyncState } from '@/db/sync';
 import { SHEET_GUIDE_URL, SHEET_TEMPLATE_URL } from '@/lib/links';
 import { confirmAction } from '@/lib/confirm';
 import { ConnectionDetails } from './ConnectionDetails';
@@ -26,12 +26,20 @@ export function GoogleSheetCard() {
   const [showKey, setShowKey] = useState(false); // a secret, so it's dots unless asked
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
+  const [waiting, setWaiting] = useState(0);
+  const { running } = useSyncStatus();
 
   const load = useCallback(async () => {
     setConnection(await getConnection());
     setState(await getSyncState());
+    setWaiting(await waitingToSync());
   }, []);
   useFocusEffect(useCallback(() => void load(), [load]));
+  useEffect(() => { // a sync just ended
+    if (running) return;
+    getSyncState().then(setState, () => {});
+    waitingToSync().then(setWaiting, () => {});
+  }, [running]);
 
   const run = async (fn: () => Promise<string>) => {
     setBusy(true);
@@ -76,6 +84,8 @@ export function GoogleSheetCard() {
           <Muted>
             {state?.lastError
               ? `Last sync failed: ${state.lastError}`
+              : waiting
+                ? `${waiting} recommendation${waiting === 1 ? '' : 's'} waiting to sync`
               : state?.lastSyncAt
                 ? `Last synced ${ago(state.lastSyncAt)}. Syncs automatically after changes.`
                 : 'Not synced yet.'}

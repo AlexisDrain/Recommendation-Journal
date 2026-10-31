@@ -19,6 +19,8 @@ import { transaction } from './transaction';
 const CONNECTION_KEY = 'recjournal.sheetConnection';
 const STATE_KEY = 'recjournal.sheetSync.v1';
 const PUSH_BATCH = 300;
+/** A phone can suspend the app mid-request: without a limit, that sync would block all later ones. */
+const REQUEST_TIMEOUT_MS = 90_000;
 /** The version of google-sheets/RecommendationJournalSync.gs this app was built for (its SCRIPT_VERSION). */
 export const LATEST_SCRIPT_VERSION = 6;
 
@@ -60,18 +62,23 @@ async function saveState(s: SyncState) {
 }
 
 async function call<T>(conn: Connection, action: string, body: object = {}): Promise<T> {
-  let res: Response;
+  const limit = new AbortController();
+  const timer = setTimeout(() => limit.abort(), REQUEST_TIMEOUT_MS);
+  let text: string;
   try {
     // text/plain keeps this a "simple" request (no CORS preflight), which Apps Script requires on the web.
-    res = await fetch(conn.url, {
+    const res = await fetch(conn.url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ secret: conn.secret, action, ...body }),
+      signal: limit.signal,
     });
+    text = await res.text();
   } catch {
-    throw new Error("Can't reach Google. Check your internet connection.");
+    throw new Error(limit.signal.aborted ? "Google didn't answer in time. Your changes are saved here and will sync later." : "Can't reach Google. Check your internet connection.");
+  } finally {
+    clearTimeout(timer);
   }
-  const text = await res.text();
   let data: { ok: boolean; error?: string } & T;
   try {
     data = JSON.parse(text);
@@ -224,6 +231,8 @@ export function syncNow(): Promise<Result> {
       throw e;
     } finally {
       running = null;
+      // Something changed during a sync that failed: its changes shouldn't wait for the next trigger.
+      if (again) requestSync(0);
       again = false;
     }
   })();
@@ -264,8 +273,12 @@ async function runSync() {
         })),
         pull: false,
       });
-      // Sent: these fields are the sheet's now too. (An edit made during the sync keeps its list.)
-      for (const it of batch) if (sentWith.has(it.uid)) await markSynced(it.uid, it.updatedAt, sentWith.get(it.uid)!);
+      // Sent: these fields are the sheet's now too. An item changed during the send keeps its list,
+      // even if time and list look the same (times are kept to the second).
+      const now = new Map((await allItems()).map((it) => [it.uid, JSON.stringify(it)]));
+      for (const it of batch) {
+        if (sentWith.has(it.uid) && now.get(it.uid) === JSON.stringify(it)) await markSynced(it.uid, it.updatedAt, sentWith.get(it.uid)!);
+      }
     }
     if (changed.length) state.lastPushed = changed.reduce((max, i) => (i.updatedAt > max ? i.updatedAt : max), state.lastPushed);
     if (answer.now) state.lastPulled = answer.now;
@@ -416,6 +429,14 @@ export async function eraseAllDeleted(): Promise<number> {
   return getData().deleted.length;
 }
 
+/** The app is being left: a sync that was about to happen happens now. iOS and Android may pause it soon. */
+export function syncIfWaiting() {
+  if (timer) requestSync(0);
+}
+
+/** How many recommendations have changes the sheet doesn't have yet. */
+export const waitingToSync = async () => (await unsyncedFields()).size;
+
 async function eraseOldDeleted() {
   let before = new Date(Date.now() - DELETED_DAYS * 86_400_000).toISOString().slice(0, 19) + 'Z';
   if (await getConnection()) {
@@ -425,5 +446,9 @@ async function eraseOldDeleted() {
   if (before) await store.items.eraseDeleted(before);
 }
 
-// Every change made in the app goes to the sheet a few seconds later.
-onLocalChange(() => requestSync());
+// Every change made in the app goes to the sheet a few seconds later. During a sync it goes round
+// once more straight after: the running one may already be past collecting what to send.
+onLocalChange(() => {
+  if (running) again = true;
+  else requestSync();
+});

@@ -1,8 +1,8 @@
 // The add / edit panel for one recommendation. Only the title is needed: everything else has a
 // sensible default (the category you're looking at, "want to", recommended today), so adding is
 // type → Enter → Save.
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { categoryNamed, store, useData } from '@/db/store';
 import { withArticle } from '@/lib/categories';
 import { today } from '@/lib/dates';
@@ -139,6 +139,14 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
     onClose();
   };
   useCloseHandler(registerClose, close);
+  // Leaving the app with the card open: the phone may close the app, so keep what's typed as the
+  // same draft. The next time the card opens, it comes back.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active' && changed) keepDraft(draftKey, draft as unknown as Record<string, unknown>, newCategory as unknown as Record<string, unknown> | null);
+    });
+    return () => sub.remove();
+  });
   const { scroll, onScroll, reveal } = useRevealFocused();
   /** Throw the draft away: back to the saved version (or an empty new one). */
   const discard = () => {

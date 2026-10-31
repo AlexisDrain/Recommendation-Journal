@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { requestSync } from '@/db/sync';
+import { requestSync, syncIfWaiting } from '@/db/sync';
 import { useDisplayModeLoaded, useThemeName } from '@/lib/displayMode';
 import { colors } from '@/lib/theme';
 import { installWebHead } from '@/lib/webHead';
@@ -19,7 +19,10 @@ export default function RootLayout() {
   // Pick up changes from the Google Sheet (if connected) on launch and when the app comes back.
   useEffect(() => {
     requestSync(0);
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') requestSync(0); });
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') requestSync(0);
+      else syncIfWaiting(); // leaving: don't wait out the few seconds after a change
+    });
     return () => sub.remove();
   }, []);
 
