@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Linking, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Linking, ScrollView, Switch, Text, View } from 'react-native';
 import { GoogleSheetCard } from '@/components/GoogleSheetCard';
-import { Button, Card, Chip, ErrorBox, Muted, styles } from '@/components/ui';
+import { Button, Card, Chip, ErrorBox, Muted, Row, styles } from '@/components/ui';
 import { exportCsv, exportXlsx, pickAndImport } from '@/db/exchange';
 import { requestSync } from '@/db/sync';
+import { installedCode, loadApkChecksOff, saveApkChecksOff } from '@/lib/apkUpdate';
 import buildInfo from '@/lib/buildInfo.json';
 import { DAY_ENDS, DAY_STARTS, setDisplayMode, useDisplayMode, useThemeName, type DisplayMode } from '@/lib/displayMode';
 import { REPO_URL, SUPPORT_EMAIL } from '@/lib/links';
@@ -21,6 +22,8 @@ export default function SettingsScreen() {
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<'xlsx' | 'csv' | 'import' | null>(null);
   const display = useDisplayMode();
+  const [apkChecks, setApkChecks] = useState(true);
+  useEffect(() => { loadApkChecksOff().then((off) => setApkChecks(!off), () => {}); }, []);
 
   const run = async (what: 'xlsx' | 'csv' | 'import', fn: () => Promise<void>) => {
     setBusy(what);
@@ -119,6 +122,15 @@ export default function SettingsScreen() {
           Recommendation Journal {buildInfo.version} · build {buildInfo.build}
         </Text>
         <Muted>Published {buildInfo.date || 'from a development copy'}</Muted>
+        {installedCode() !== null && (
+          <>
+            <Row label="Check for new Android versions">
+              <Switch value={apkChecks} trackColor={{ true: colors.accent }}
+                onValueChange={(v) => { setApkChecks(v); saveApkChecksOff(!v).catch(() => {}); }} />
+            </Row>
+            <Muted>Asks GitHub once a day. GitHub can see your internet address, but nothing about you or your list is sent.</Muted>
+          </>
+        )}
         <Muted>
           Project page and source code:{' '}
           <Text style={{ color: colors.accent, textDecorationLine: 'underline' }} accessibilityRole="link"

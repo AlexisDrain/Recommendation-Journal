@@ -3,7 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { FlatList, Linking, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { CategoryPicker, CategoryTabs } from '@/components/CategoryTabs';
 import { CategoryEditor } from '@/components/CategoryEditor';
 import { DeletedRow } from '@/components/DeletedRow';
@@ -12,9 +12,10 @@ import { ItemRow } from '@/components/ItemRow';
 import { SortableList } from '@/components/SortableList';
 import { SyncChip } from '@/components/SyncChip';
 import { Toast, type ToastMessage } from '@/components/Toast';
-import { Chip, ErrorBox, Muted, styles } from '@/components/ui';
+import { Button, Card, Chip, ErrorBox, Muted, styles } from '@/components/ui';
 import { DELETED_DAYS, reload, store, useData } from '@/db/store';
 import { eraseAllDeleted, getConnection, syncNow, useSyncStatus } from '@/db/sync';
+import { useApkUpdate } from '@/lib/apkUpdate';
 import { confirmAction } from '@/lib/confirm';
 import { withArticle } from '@/lib/categories';
 import { useThemeName } from '@/lib/displayMode';
@@ -54,6 +55,7 @@ export default function ListScreen() {
   useThemeName(); // redraw when the display changes (dark / light)
   const { categories, items, deleted, deletedCategories, loaded, error } = useData();
   const drafts = useDrafts();
+  const apkUpdate = useApkUpdate();
   const [query, setQuery] = useState('');
   /** A category's uid, 'all', 'upnext' (Priority) or 'deleted' (Recently deleted). */
   const [categoryUid, setCategoryUid] = useState<string>('all');
@@ -202,6 +204,13 @@ export default function ListScreen() {
 
   const header = (
     <View style={{ gap: space.md, paddingBottom: space.md }}>
+      {apkUpdate.release && (
+        <Card title="New Android version">
+          <Muted>A new version of the app is out. Installing it keeps your list.</Muted>
+          <Button title="Download" small onPress={() => void Linking.openURL(apkUpdate.release!.url).catch(() => {})} />
+          <Button title="Not now" small onPress={apkUpdate.dismiss} color={colors.chip} textColor={colors.text} />
+        </Card>
+      )}
       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: radius, borderWidth: 1, borderColor: colors.cardBorder }}>
         <Text style={{ color: colors.muted, fontSize: 18, paddingLeft: space.md }}>⌕</Text>
         <TextInput ref={input} value={query} onChangeText={setQuery} placeholderTextColor={colors.muted}

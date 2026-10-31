@@ -120,7 +120,7 @@ only opens EAS Updates from projects your own Expo account owns, so other people
 |---|---|---|
 | You, in Expo Go | `npm run release:phone` (preview channel) | Free |
 | Anyone, in a browser | https://recommendation-journal.expo.app (EAS Hosting) | Free tier |
-| Anyone on Android | `npx eas-cli@latest build -p android --profile preview` → share the `.apk` | Free tier |
+| Anyone on Android | The `.apk` on GitHub Releases (below) | Free tier |
 | Testers on iPhone | TestFlight (below) | Apple Developer Program |
 
 **TestFlight.** The installed app follows the `production` update channel, which `npm run release`
@@ -137,8 +137,31 @@ npx eas-cli@latest build -p ios --profile production --auto-submit
 When it's processed (an email from Apple, 10–30 minutes later), add testers in App Store Connect →
 the app → TestFlight. The app's ID is `io.github.alexisdrain.recommendationjournal`.
 
+**Android APK on GitHub Releases.** Android ships as an APK, with no Play Store. Ordinary changes
+reach it as over-the-air updates (`production` channel). A new APK is only for native changes: an
+Expo SDK upgrade, a new package with native code, or native settings in `app.json`. Stop the web
+dev server, then:
+
+```bash
+cd app
+npx eas-cli@latest build -p android --profile apk
+```
+
+The version code goes up by itself. The first build creates the signing key on Expo's servers:
+every APK has to use that same key, or it can't install over the previous one. Never commit signing
+files. Then publish a GitHub release tagged `android-<versionCode>`, e.g. `android-12`, with the
+`.apk` attached. Don't publish before testing on a real Android phone: keyboard, date pickers,
+pull-to-sync, export and import, and the back button.
+
+Installed APKs ask GitHub for the latest release once a day (`src/lib/apkUpdate.ts`) and show a
+notice if its number is higher. That never runs on iPhone, the web or Expo Go, and the repo has to
+be public for it to work. If this ever goes on Google Play, turn the check off for Play installs.
+
 ## Privacy & security notes
 
-- No network requests unless you export or connect your own Google Sheet (then only to your sheet's script).
+- No network requests unless you connect your own Google Sheet (then only to your sheet's script).
+- Over-the-air updates come from Expo's servers. The Android APK also asks GitHub once a day whether
+  a newer APK exists (off in Settings → About). GitHub can see the phone's internet address; no user
+  data or device details are sent.
 - Personal data is git-ignored (`*.csv`, `*.xlsx`, `*.db`); don't commit your own lists.
 - Protect your Expo and GitHub accounts with 2FA: whoever controls the Expo project can publish updates.
