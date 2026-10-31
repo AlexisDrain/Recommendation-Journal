@@ -1,4 +1,4 @@
-# Recommendation-Journal
+# Recommendation Journal
 
 Remember what people recommend to you and why: movies, video games, albums, and more. Free and open-source. The journal stays on your device. No account, no ads, no tracking.
 
