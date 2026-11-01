@@ -5,7 +5,8 @@ import { useThemeName } from '@/lib/displayMode';
 import { useWide } from '@/lib/useLayout';
 
 function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
-  return <Text style={{ color, fontSize: 20 }}>{glyph}</Text>;
+  // ︎ asks for the plain text symbol: as an emoji, ⚙ ignores the color and looks always selected.
+  return <Text style={{ color, fontSize: 20 }}>{glyph}{'︎'}</Text>;
 }
 
 export default function TabsLayout() {
