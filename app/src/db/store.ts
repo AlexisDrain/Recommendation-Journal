@@ -280,17 +280,27 @@ const closePriorityGap = () => upNext.reorder(upNext.list().map((i) => i.uid));
 
 /**
  * "My order": puts these items in this order (after a drag), using the places they already had,
- * so items that weren't shown (other categories, filtered out) keep theirs. Only the items whose
- * place changed are stamped, so only they sync.
+ * so items that weren't shown (other categories, filtered out) keep theirs. Two lists merged by
+ * connecting to another sheet can share places: those are moved up just enough to come apart,
+ * or the drag would change nothing. Only the items whose place changed are stamped, so only they sync.
  */
 async function reorderManually(uids: string[]) {
+  const shown = new Set(uids);
   const pos = new Map(data.items.map((i) => [i.uid, i.manualPos]));
-  const places = uids.map((u) => pos.get(u) ?? 0).sort((a, b) => b - a); // highest first
+  const all = [...data.items].sort((a, b) => b.manualPos - a.manualPos);
+  const queue = [...uids];
+  const order = all.map((i) => (shown.has(i.uid) ? queue.shift()! : i.uid));
+  const places = new Map<string, number>();
+  let below = -Infinity;
+  for (let i = order.length - 1; i >= 0; i--) { // lowest first
+    below = Math.max(all[i].manualPos, below + 1);
+    places.set(order[i], below);
+  }
   const db = await getDb();
   const now = stamp();
   await transaction(db, async (tx) => {
-    for (const [i, uid] of uids.entries()) {
-      if (pos.get(uid) !== places[i]) await tx.runAsync(`UPDATE items SET manual_pos = ?, updated_at = ? WHERE uid = ?`, places[i], now, uid);
+    for (const [uid, place] of places) {
+      if (pos.get(uid) !== place) await tx.runAsync(`UPDATE items SET manual_pos = ?, updated_at = ? WHERE uid = ?`, place, now, uid);
     }
   });
   await changed();
