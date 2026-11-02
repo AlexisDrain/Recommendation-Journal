@@ -11,6 +11,7 @@ import { categoryKey, tidyWords } from '@/lib/categories';
 import { stamp, today } from '@/lib/dates';
 import type { Category, CategoryPatch, Item, ItemPatch } from '@/lib/types';
 import { migrate } from './migrations';
+import { MAX_TEXT } from './rowFormat';
 import { transaction } from './transaction';
 import { claimWebDatabase, explainStorageError } from './webStorage';
 
@@ -196,7 +197,7 @@ const ITEM_COLUMNS = {
 /** Tidies a patch: trims text, and stamps "done on" today when something is first marked done. */
 function cleanPatch(patch: ItemPatch, before?: Item): ItemPatch {
   const p: ItemPatch = { ...patch };
-  for (const k of ['title', 'author', 'recommendedBy', 'note'] as const) if (p[k] !== undefined) p[k] = p[k]!.trim();
+  for (const k of ['title', 'author', 'recommendedBy', 'note'] as const) if (p[k] !== undefined) p[k] = p[k]!.trim().slice(0, MAX_TEXT);
   if (p.rating && p.status === undefined && before?.status === 'want') p.status = 'done'; // rating it = you've had it
   if (p.status === 'done' && before?.status !== 'done' && p.doneOn === undefined && !before?.doneOn) p.doneOn = today();
   if (p.status === 'want' && before?.status === 'done' && p.doneOn === undefined) p.doneOn = null;

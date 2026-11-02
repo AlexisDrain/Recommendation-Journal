@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { categoryNamed, store, useData } from '@/db/store';
+import { MAX_TEXT } from '@/db/rowFormat';
 import { withArticle } from '@/lib/categories';
 import { today } from '@/lib/dates';
 import { dropDraft, getDraft, keepDraft } from '@/lib/drafts';
@@ -13,7 +14,7 @@ import { colors, radius, space } from '@/lib/theme';
 import type { Item, Rating, Status } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
 import { DateField } from './DateField';
-import { Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
+import { formContent, formHeader, Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
 import { Button, Chip, Input, styles } from './ui';
 
 /** Above this many categories the panel shows only the most-used ones, with a "+ N more" chip. */
@@ -169,8 +170,8 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
 
   return (
     <ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ gap: space.md }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: space.md }}>
+      contentContainerStyle={formContent}>
+      <View style={formHeader}>
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', flex: 1 }}>
           {item ? 'Edit' : `Add ${withArticle(category?.noun || 'recommendation')}`}
         </Text>
@@ -180,11 +181,11 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       </View>
 
       <Section n={n()} title="What is it?" />
-      <Input placeholder="Title" value={draft.title} onChangeText={(title) => set({ title })}
+      <Input placeholder="Title" value={draft.title} onChangeText={(title) => set({ title })} maxLength={MAX_TEXT}
         autoFocus={!item && !draft.title} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Title" />
       {duplicate && <Text style={{ color: colors.warm }}>Already on your list in this category.</Text>}
       <Input placeholder="Author (or director, artist…), like Stephen King" value={draft.author}
-        onChangeText={(author) => set({ author })} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
+        onChangeText={(author) => set({ author })} maxLength={MAX_TEXT} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
 
       <Section n={n()} title="Category" />
       <View style={styles.chips}>
@@ -212,13 +213,13 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
 
       <Section n={n()} title="Who recommended it, and why?" />
       <Input placeholder="Who? (my brother, a stranger in the park…)" value={draft.recommendedBy}
-        onChangeText={(recommendedBy) => set({ recommendedBy })} onFocus={reveal} accessibilityLabel="Recommended by" />
+        onChangeText={(recommendedBy) => set({ recommendedBy })} maxLength={MAX_TEXT} onFocus={reveal} accessibilityLabel="Recommended by" />
       {suggestions.length > 0 && (
         <View style={styles.chips}>
           {suggestions.map((p) => <Chip key={p} label={p} onPress={() => set({ recommendedBy: p })} />)}
         </View>
       )}
-      <Input placeholder="Why? What did they say about it?" value={draft.note} onChangeText={(note) => set({ note })}
+      <Input placeholder="Why? What did they say about it?" value={draft.note} onChangeText={(note) => set({ note })} maxLength={MAX_TEXT}
         multiline onFocus={reveal} accessibilityLabel="Why it was recommended" />
 
       <Section n={n()} title={`${category?.doneLabel || 'Done'} it? When?`} />

@@ -63,6 +63,14 @@ export function useCloseRequest(onClose: () => void) {
 }
 
 /**
+ * The content of a panel's scrolling form. On the web a gap on the right keeps the content clear of
+ * the scroll bar, which would otherwise sit right on top of a text box's own scroll bar.
+ */
+export const formContent = { gap: space.md, paddingRight: Platform.OS === 'web' ? space.md : 0 };
+/** The form's title row: the × lines up with the boxes below it. */
+export const formHeader = { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: Platform.OS === 'web' ? 0 : space.md } as const;
+
+/**
  * For a panel's scrolling form: keeps the box you're typing in visible above the keyboard. The
  * panel shrinks to sit above the keyboard, but its content doesn't scroll by itself, so the box
  * could end up hidden below the fold. Pass `scroll` and `onScroll` to the ScrollView, and `reveal`

@@ -6,7 +6,7 @@ import { confirmAction } from '@/lib/confirm';
 import { colors, space } from '@/lib/theme';
 import type { Category } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
-import { Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
+import { formContent, formHeader, Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
 import { Button, Muted, Row } from './ui';
 
 interface Props {
@@ -76,8 +76,8 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
 
   return (
     <ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ gap: space.md }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: space.md }}>
+      contentContainerStyle={formContent}>
+      <View style={formHeader}>
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{category ? 'Edit category' : 'New category'}</Text>
         <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
           <Text style={{ color: colors.muted, fontSize: 22 }}>×</Text>

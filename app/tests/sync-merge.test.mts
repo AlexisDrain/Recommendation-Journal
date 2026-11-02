@@ -17,12 +17,14 @@ const secret = String(env.ctx.lastLog).split('\n')[1];
 /** Runs once inside the next request that sends recommendations, as if the user acted during a sync. */
 let duringSend: ((sent: { id: string; updated: string }[]) => Promise<unknown>) | null = null;
 let frozen = false; // the next request never answers, as when a phone suspends the app
+let pulls = 0; // requests that receive from the sheet (one per sync)
 (globalThis as any).fetch = async (_url: string, init: any) => {
   if (frozen) {
     frozen = false;
     return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))));
   }
-  const { items } = JSON.parse(init.body);
+  const { items, pull } = JSON.parse(init.body);
+  if (pull) pulls++;
   if (duringSend && items?.length) {
     const act = duringSend;
     duringSend = null;
@@ -139,6 +141,14 @@ test('an edit made during a sync reaches the sheet with no further trigger', asy
   await syncNow();
   assert.equal(cell('Collateral', 'Why'), 'typed during the sync');
   assert.equal(await waitingToSync(), 0);
+});
+
+test('asked again during a sync with nothing new: one sync, not two', async () => {
+  await syncNow();
+  pulls = 0;
+  // Opening the app asks twice: at launch, and again when it becomes "active".
+  await Promise.all([syncNow(), syncNow()]);
+  assert.equal(pulls, 1);
 });
 
 test('an edit in the same second as the copy being sent still reaches the sheet', async () => {

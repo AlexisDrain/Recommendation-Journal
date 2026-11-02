@@ -89,6 +89,13 @@ export function parseStatus(raw: string, cat: Pick<Category, 'wantLabel' | 'done
   return hints.rating || hints.doneOn ? 'done' : 'want';
 }
 
+/**
+ * The longest a recommendation's text can be. Google Sheets refuses a cell over 50,000
+ * characters, and one refused cell would stop every sync.
+ */
+export const MAX_TEXT = 20_000;
+const clip = (v: string) => v.slice(0, MAX_TEXT);
+
 /** `author` / `queuePos` are left out when the row has no such column (an older sheet), so they aren't wiped. */
 export type RowFields = { author?: string; queuePos?: number | null; manualPos?: number | null } & Pick<Item, 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>;
 
@@ -113,14 +120,14 @@ export function rowFields(map: HeaderMap, row: string[], cat: Pick<Category, 'wa
   if (keep && !recommendedOn && get('Recommended on')) kept.push(`Recommended: ${get('Recommended on')}`);
   if (keep && !rating && get('Rating')) kept.push(`Rating: ${get('Rating')}`);
   return {
-    title,
-    ...(map.col.Author !== undefined && { author: get('Author') }),
+    title: clip(title),
+    ...(map.col.Author !== undefined && { author: clip(get('Author')) }),
     ...(map.order !== undefined && { manualPos: Number.isFinite(Number(row[map.order])) && String(row[map.order]).trim() !== '' ? Number(row[map.order]) : null }),
     ...(map.col.Priority !== undefined && { queuePos: /^\d+$/.test(get('Priority')) && Number(get('Priority')) > 0 ? Number(get('Priority')) : null }),
     status: parseStatus(get('Status'), cat, { rating: !!rating, doneOn: !!doneOn }),
     rating,
-    recommendedBy: get('Recommended by'),
-    note: [get('Why'), ...kept].filter(Boolean).join('\n'),
+    recommendedBy: clip(get('Recommended by')),
+    note: clip([get('Why'), ...kept].filter(Boolean).join('\n')),
     recommendedOn,
     doneOn,
   };

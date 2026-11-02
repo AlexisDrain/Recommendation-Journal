@@ -219,9 +219,13 @@ export function syncNow(): Promise<Result> {
   running = (async () => {
     setStatus({ running: true, error: status.error });
     try {
+      let started = stamp();
       let result = await runSync();
-      while (again) {
+      // Asked again meanwhile: only go round if there's something to send. Opening the app asks
+      // twice (launch, then "active"), and the sync that's running already receives everything.
+      while (again && await somethingToSend(started)) {
         again = false;
+        started = stamp();
         const next = await runSync();
         result = { pushed: result.pushed + next.pushed, pulled: result.pulled + next.pulled };
       }
@@ -238,6 +242,14 @@ export function syncNow(): Promise<Result> {
     }
   })();
   return running;
+}
+
+/** Changes not sent yet: recommendations saved after the last one sent, or categories changed since `since`. */
+async function somethingToSend(since: string): Promise<boolean> {
+  const { lastPushed } = await getSyncState();
+  if ((await unsyncedFields()).size) return true;
+  if ((await allItems()).some((i) => i.updatedAt > lastPushed)) return true;
+  return (await allCategories()).some((c) => c.updatedAt >= since); // same second: can't tell, so send
 }
 
 async function runSync() {

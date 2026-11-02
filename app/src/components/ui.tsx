@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode, type Ref, type RefObject } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -86,13 +87,47 @@ export function Chip({ label, selected, onPress, color = colors.accent }: {
   );
 }
 
+/**
+ * A text box. Multiline ones grow with their text up to 200 points, then scroll. With a
+ * `maxLength`, a count shows once the text gets near it.
+ */
 export function Input(props: TextInputProps) {
-  return (
+  const box = useRef<HTMLTextAreaElement | null>(null);
+  // Phones grow a multiline box by themselves; a browser's doesn't. Sized here rather than with
+  // onContentSizeChange and state, which on the web goes round in a loop and crashes the page.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (Platform.OS !== 'web' || !props.multiline || !el?.style) return;
+    const s = getComputedStyle(el);
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + parseFloat(s.borderTopWidth) + parseFloat(s.borderBottomWidth)}px`;
+  }, [props.value, props.multiline]);
+
+  const length = props.value?.length ?? 0;
+  const input = (
     <TextInput
       placeholderTextColor={colors.muted}
       {...props}
-      style={[styles.input, props.multiline && { minHeight: 72, textAlignVertical: 'top' }, props.style]}
+      ref={(el) => {
+        box.current = el as unknown as HTMLTextAreaElement | null; // on the web, the <textarea> itself
+        const { ref } = props as { ref?: Ref<unknown> };
+        if (typeof ref === 'function') ref(el);
+        else if (ref) (ref as RefObject<unknown>).current = el;
+      }}
+      style={[styles.input, props.multiline && { minHeight: 72, maxHeight: 200, textAlignVertical: 'top' }, props.style]}
     />
+  );
+  if (!props.maxLength) return input;
+  // Always in this View, so the box isn't rebuilt (and doesn't lose the keyboard) when the count appears.
+  return (
+    <View style={{ gap: space.xs }}>
+      {input}
+      {length >= props.maxLength * 0.9 && (
+        <Text style={[styles.muted, { textAlign: 'right', color: length >= props.maxLength ? colors.danger : colors.muted }]}>
+          {length.toLocaleString()} / {props.maxLength.toLocaleString()} characters
+        </Text>
+      )}
+    </View>
   );
 }
 
