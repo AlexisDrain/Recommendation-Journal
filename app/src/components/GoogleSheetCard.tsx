@@ -99,7 +99,7 @@ export function GoogleSheetCard() {
           )}
           <Button title="Sync now" onPress={onSync} busy={busy} small />
           {state?.sheetUrl && (
-            <Button title="Open sheet ↗" small color={colors.chip} textColor={colors.text}
+            <Button title="Open in Google Sheet ↗" small color={colors.chip} textColor={colors.text}
               onPress={() => Linking.openURL(state.sheetUrl!).catch(() => {})} />
           )}
           {connection && <ConnectionDetails connection={connection} />}

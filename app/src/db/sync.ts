@@ -28,7 +28,7 @@ export interface Connection { url: string; secret: string }
 
 export interface SyncState {
   sheetName: string | null;
-  /** The spreadsheet's address, for "Open sheet". */
+  /** The spreadsheet's address, for "Open in Google Sheet". */
   sheetUrl: string | null;
   lastPushed: string; // newest `updatedAt` already sent
   lastPulled: string; // the sheet's clock at the last pull: rows changed since then come next time
@@ -58,6 +58,7 @@ export async function getSyncState(): Promise<SyncState> {
 }
 
 async function saveState(s: SyncState) {
+  if (!(await getConnection())) return; // disconnected during a sync: don't bring the old state back
   await AsyncStorage.setItem(STATE_KEY, JSON.stringify(s));
 }
 
