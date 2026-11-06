@@ -4,6 +4,7 @@ node_modules/
 
 # Personal data (your lists, exports, study sheets): keep them out of the repo
 *.csv
+!promo/source/demo.csv
 *.xlsx
 *.db
 *.sqlite
