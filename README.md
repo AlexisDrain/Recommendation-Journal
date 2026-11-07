@@ -1,8 +1,16 @@
 # Recommendation Journal
 
-Remember what people recommend to you and why: movies, video games, albums, and more. Free and open-source. The journal stays on your device. No account, no ads, no tracking.
+Remember what people recommend to you, who told you, and why: movies, video games, albums, and more. Mark them done and rate them when you've tried them.
 
-You can sync your data between devices using Google Sheet.
+Type in one box: it searches your list and allows you to add what's not there yet.
+
+Free and open source. The journal stays on your device. No account, no ads, no tracking.
+
+You can sync your data between devices using your own Google Sheet, or import/export it as .xlsx or .csv.
+
+Preview music: "Inspired" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
 
 **Try it now: https://recommendation-journal.expo.app/**
 
