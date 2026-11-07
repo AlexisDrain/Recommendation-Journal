@@ -108,11 +108,16 @@ No account or sign-in is needed: everything is stored on the device. Syncing wit
 
 | Field in App Store Connect | File | Size |
 |---|---|---|
-| Header Asset | `header/header-5244x2950.png` (or `header-3840x1646.png`) | 5244 × 2950, 3840 × 1646 (no text: an iPhone shows only the middle half, with the name printed below) |
-| Search Results Asset | `search-results/search-5244x2950.png` (or the 3840 × 2560 / 1920 × 1280 ones) | all three supported sizes (no text, like the header: it's cropped, with the name printed above) |
+| Header Asset | `header/header-5244x2950.png` (or `header-3840x1646.png`) | 5244 × 2950, 3840 × 1646 |
+| Search Results Asset | `search-results/search-5244x2950.png` (or the 3840 × 2560 / 1920 × 1280 ones) | all three supported sizes |
 | iPhone screenshots (6.1" / 6.3") | `screenshots/iphone/01…10` (with captions), or `screenshots/iphone-plain/` | 1179 × 2556 |
 | iPhone app previews | `app-previews/1…3` | 886 × 1920, 30 fps, 21–28 s |
 
+- **Header and Search Results:** on an iPhone the App Store shows only about the middle 40% of the
+  width and the upper-middle half of the height of these, zoomed in. Phone screenshots there were
+  too small to read. So they're the app's name, a subtitle ("Save recommendations from friends")
+  and two of the app's own list entries, drawn big, all inside that small area
+  (`node art.mjs --cards --named`; the entries are in `source/art.html`).
 - **Screenshots:** upload them in number order. The first three are the ones most people see in
   search results. Use either the captioned set or the plain one, not a mix.
 - **App previews:** H.264 .mp4 files with music: "Inspired" by Kevin MacLeod, the trailer's

@@ -38,6 +38,61 @@
   body.header.wide .phones { height: 100vh; width: calc(100vh * 0.4615 * 1.75); margin-top: 22vh; }
   body.header.wide .phone { height: 100vh; border-radius: 6vh; }
   body.header.wide .p1, body.header.wide .p3 { height: 90vh; }
+  /* "named": the app's name and subtitle over the bottom of the phones, on a dark fade, kept inside
+     the middle of the picture (the part an iPhone shows). */
+  .named { display: none; }
+  body.withname .named { display: block; position: absolute; left: 0; right: 0; bottom: 0; height: 52vh; z-index: 5;
+    background: linear-gradient(to bottom, rgba(14,17,32,0) 0%, rgba(14,17,32,0.85) 45%, #0e1120 100%); }
+  body.withname .named div { position: absolute; left: 0; right: 0; bottom: 9vh; text-align: center; }
+  body.withname .named b { display: block; font-size: min(7.2vh, 3.9vw); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: #e8eaf6; }
+  body.withname .named b span { color: #ffc47a; }
+  body.withname .named i { display: block; font-style: normal; font-size: min(4vh, 2.2vw); color: #b9bee0; margin-top: 1.6vh; }
+  /* "icon": what the App Store actually shows of the header and search pictures on an iPhone is only
+     about the middle 40% of the width and the upper-middle half of the height, zoomed in. Phone
+     screens can't be read at that size, so: the app's icon, big, on a soft glow, centered a little
+     above the middle; with "named", the name and subtitle under it. All inside that small area. */
+  .hero { display: none; }
+  body.iconart .text, body.iconart .phones, body.iconart .named { display: none !important; }
+  body.iconart { background: radial-gradient(ellipse 38% 55% at 50% 40%, rgba(159,168,255,0.34), transparent 72%),
+                          linear-gradient(160deg, #1c2046 0%, #0e1120 75%); }
+  body.iconart .hero { display: flex; position: absolute; left: 50%; top: 39%; transform: translate(-50%, -50%);
+    flex-direction: column; align-items: center; text-align: center; }
+  body.iconart .hero img { height: 38vh; width: 38vh; border-radius: 8.5vh;
+    box-shadow: 0 3vh 9vh rgba(0,0,0,0.5), 0 0 14vh rgba(159,168,255,0.35); }
+  body.iconart .hero b, body.iconart .hero i { display: none; }
+  body.iconart.withname .hero img { height: 24vh; width: 24vh; border-radius: 5.4vh; }
+  body.iconart.withname .hero b { display: block; margin-top: 4vh; font-size: min(5.6vh, 3vw); font-weight: 700;
+    letter-spacing: -0.02em; line-height: 1.1; color: #e8eaf6; white-space: nowrap; }
+  body.iconart.withname .hero b span { color: #ffc47a; }
+  body.iconart.withname .hero i { display: block; font-style: normal; margin-top: 1.4vh; font-size: min(3.3vh, 1.8vw); color: #b9bee0; white-space: nowrap; }
+  /* "cards": three of the app's own list entries, drawn big, so they can be read in the small part of
+     the picture an iPhone shows (about the middle 40% of the width, from 17% to 58% of the height).
+     Each says the whole idea: what it is, who told you, what they said, and how it went.
+     With "named", the name and subtitle above two of them. */
+  .cards { display: none; }
+  body.cardart .text, body.cardart .phones, body.cardart .named, body.cardart .hero { display: none !important; }
+  body.cardart { background: radial-gradient(ellipse 40% 50% at 50% 38%, rgba(159,168,255,0.30), transparent 72%),
+                             linear-gradient(160deg, #1c2046 0%, #0e1120 75%); }
+  body.cardart .cards { display: flex; flex-direction: column; gap: 1.1vh; position: absolute; left: 50%; top: 37.5%;
+    transform: translate(-50%, -50%); width: min(38vw, 68vh); }
+  .card { background: #181c33; border: 0.25vh solid #262b4a; border-left: 0.9vh solid #ffc47a; border-radius: 1.8vh;
+    padding: 1.1vh 2vh; display: flex; align-items: center; gap: 2vh; box-shadow: 0 1.5vh 4vh rgba(0,0,0,0.45); }
+  .card.done { border-left-color: #7be0a8; }
+  .card:nth-child(1) { transform: rotate(-1.5deg) translateX(-2vh); }
+  .card:nth-child(2) { transform: rotate(1deg) translateX(2vh); }
+  .card:nth-child(3) { transform: rotate(-0.8deg) translateX(-1vh); }
+  .card div { flex: 1; min-width: 0; }
+  .card b { display: block; font-size: 3vh; line-height: 1.2; font-weight: 600; color: #e8eaf6; white-space: nowrap; }
+  .card b em { font-style: normal; color: #ffc47a; }
+  .card small { display: block; font-size: 1.9vh; line-height: 1.25; color: #8a90b2; margin-top: 0.2vh; white-space: nowrap; }
+  .card q { display: block; font-size: 2.1vh; line-height: 1.25; color: #e8eaf6; font-style: italic; margin-top: 0.3vh; quotes: none; }
+  .card span.r { font-size: 3.6vh; }
+  .cards .title { display: none; text-align: center; margin-bottom: 0.6vh; }
+  body.cardart.withname .cards .title { display: block; }
+  body.cardart.withname .cards .card:nth-child(4) { display: none; }
+  .cards .title b { display: block; font-size: min(4.4vh, 2.5vw); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; color: #e8eaf6; white-space: nowrap; }
+  .cards .title b span { color: #ffc47a; }
+  .cards .title i { display: block; font-style: normal; font-size: min(2.5vh, 1.45vw); color: #b9bee0; margin-top: 0.3vh; }
   /* The very wide header: phones run off the bottom edge */
   body.wide .phones { height: 120vh; width: calc(120vh * 0.4615 * 2.1); margin-top: 30vh; }
   body.wide .phone { height: 120vh; border-radius: 7vh; }
@@ -57,12 +112,22 @@
     <div class="phone p3"><img src="out/plain/05-priority.png"></div>
     <div class="phone p2"><img src="out/plain/06-movies.png"></div>
   </div>
+  <div class="cards">
+    <div class="title"><b>Recommendation <span>Journal</span></b><i>Save recommendations from friends</i></div>
+    <div class="card"><div><b><em>★ 1</em>&nbsp; Severance</b><small>TV shows · Want to watch · from Sam from work</small><q>Watch it before the internet spoils it.</q></div></div>
+    <div class="card done"><div><b>Outer Wilds</b><small>Video games · Played · from my best friend</small><q>Go in knowing nothing.</q></div><span class="r">❤️</span></div>
+  </div>
+  <div class="hero"><img src="out/icon.png"><b>Recommendation <span>Journal</span></b><i>Recommendations from friends</i></div>
+  <div class="named"><div><b>Recommendation <span>Journal</span></b><i>Recommendations from friends</i></div></div>
   <script>
     const q = new URLSearchParams(location.search);
     if (q.get('kind')) document.body.classList.add(q.get('kind'));
     // Search results: the same as the header (the App Store prints the icon and name right above it, and crops it too).
     if (q.get('kind') === 'search') document.body.classList.add('header');
     if (q.get('wide')) document.body.classList.add('wide');
+    if (q.get('named')) document.body.classList.add('withname');
+    if (q.get('icon')) document.body.classList.add('iconart');
+    if (q.get('cards')) document.body.classList.add('cardart');
     // "Recommendation" is a long word: shrink the title until it fits its side, with room to spare.
     const h1 = document.querySelector('h1'), text = document.querySelector('.text');
     const room = text.clientWidth * 0.96;
