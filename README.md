@@ -4,15 +4,11 @@ Remember what people recommend to you, who told you, and why: movies, video game
 
 Type in one box: it searches your list and allows you to add what's not there yet.
 
+**Try it now: https://recommendation-journal.expo.app/**
+
 Free and open source. The journal stays on your device. No account, no ads, no tracking.
 
 You can sync your data between devices using your own Google Sheet, or import/export it as .xlsx or .csv.
-
-Preview music: "Inspired" Kevin MacLeod (incompetech.com)
-Licensed under Creative Commons: By Attribution 4.0 License
-http://creativecommons.org/licenses/by/4.0/
-
-**Try it now: https://recommendation-journal.expo.app/**
 
 ## Get the app
 
