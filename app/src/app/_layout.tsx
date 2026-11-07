@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { requestSync, syncIfWaiting } from '@/db/sync';
 import { useDisplayModeLoaded, useThemeName } from '@/lib/displayMode';
+import { useLatestUpdate } from '@/lib/latestUpdate';
 import { colors } from '@/lib/theme';
 import { installWebHead } from '@/lib/webHead';
 import { useWelcomeSeen } from '@/lib/welcome';
@@ -15,6 +16,7 @@ export default function RootLayout() {
   const theme = useThemeName();
   const displayLoaded = useDisplayModeLoaded();
   const welcomeSeen = useWelcomeSeen();
+  useLatestUpdate(); // phones: switch to a new release as soon as it's downloaded
 
   // Pick up changes from the Google Sheet (if connected) on launch and when the app comes back.
   useEffect(() => {

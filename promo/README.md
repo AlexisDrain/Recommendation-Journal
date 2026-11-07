@@ -10,6 +10,7 @@ upload. All the recommendations shown are made up (see `source/demo.csv`).
 You can change this one any time, without sending a new version for review.
 
 ```
+Alexis: Remember what people recommend to you (movies, games, albums, and more), who told you, and why. Search and add. No account, no ads.
 Alexis: Remember what people recommend to you (movies, video games, albums, and more), and why.
 
 Never forget a recommendation again. One box searches your list and adds new things. Rank what's next, rate what you've tried, and see who told you about it.
@@ -20,7 +21,8 @@ Never forget a recommendation again. One box searches your list and adds new thi
 Shown under the app's name. It's in the App Information section, not the version page.
 
 ```
-Alexis: 
+Alexis: Recommendations from friends
+Alexis: Catalog media you want to see.
 Remember who told you, and why
 ```
 
@@ -28,9 +30,13 @@ Remember who told you, and why
 
 ```
 - Alexis:
-Remember what people recommend to you and why: movies, video games, albums, and more.
+Remember what people recommend to you, who told you, and why: movies, video games, albums, and more. Mark them done and rate them when you've tried them.
 
-Free and open-source. The journal stays on your device. No account, no ads, no tracking. You can sync your data between devices using Google Sheet.
+Type in one box: it searches your list and allows you to add what's not there yet.
+
+Free and open source. The journal stays on your device. No account, no ads, no tracking.
+
+You can sync your data between devices using your own Google Sheet, or import/export it as .xlsx or .csv.
 
 Preview music: "Inspired" Kevin MacLeod (incompetech.com)
 Licensed under Creative Commons: By Attribution 4.0 License
@@ -102,8 +108,8 @@ No account or sign-in is needed: everything is stored on the device. Syncing wit
 
 | Field in App Store Connect | File | Size |
 |---|---|---|
-| Header Asset | `header/header-5244x2950.png` (or `header-3840x1646.png`) | 5244 × 2950, 3840 × 1646 |
-| Search Results Asset | `search-results/search-5244x2950.png` (or the 3840 × 2560 / 1920 × 1280 ones) | all three supported sizes |
+| Header Asset | `header/header-5244x2950.png` (or `header-3840x1646.png`) | 5244 × 2950, 3840 × 1646 (no text: an iPhone shows only the middle half, with the name printed below) |
+| Search Results Asset | `search-results/search-5244x2950.png` (or the 3840 × 2560 / 1920 × 1280 ones) | all three supported sizes (no text, like the header: it's cropped, with the name printed above) |
 | iPhone screenshots (6.1" / 6.3") | `screenshots/iphone/01…10` (with captions), or `screenshots/iphone-plain/` | 1179 × 2556 |
 | iPhone app previews | `app-previews/1…3` | 886 × 1920, 30 fps, 21–28 s |
 

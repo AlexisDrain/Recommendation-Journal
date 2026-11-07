@@ -26,6 +26,18 @@
   body.search { padding: 0 6vw; gap: 4vw; }
   body.search h1 { font-size: 10vh; }
   body.search p { font-size: 4.6vh; }
+  /* Header: the App Store shows only about the middle half of it on iPhones, with buttons over the
+     top, and prints the icon and name right under it. So no text: the three phones, close together
+     in the middle, starting below the top edge and running off the bottom. */
+  body.header { justify-content: center; padding: 0; overflow: hidden; }
+  body.header { background: radial-gradient(ellipse 45% 80% at 50% 60%, rgba(159,168,255,0.30), transparent 70%), linear-gradient(160deg, #1c2046 0%, #0e1120 70%); }
+  body.header .text { display: none; }
+  body.header .phones { height: 100vh; width: calc(100vh * 0.4615 * 1.75); margin-top: 22vh; }
+  body.header .phone { height: 100vh; border-radius: 6vh; }
+  body.header .p1, body.header .p3 { height: 90vh; top: 5vh; }
+  body.header.wide .phones { height: 100vh; width: calc(100vh * 0.4615 * 1.75); margin-top: 22vh; }
+  body.header.wide .phone { height: 100vh; border-radius: 6vh; }
+  body.header.wide .p1, body.header.wide .p3 { height: 90vh; }
   /* The very wide header: phones run off the bottom edge */
   body.wide .phones { height: 120vh; width: calc(120vh * 0.4615 * 2.1); margin-top: 30vh; }
   body.wide .phone { height: 120vh; border-radius: 7vh; }
@@ -48,6 +60,8 @@
   <script>
     const q = new URLSearchParams(location.search);
     if (q.get('kind')) document.body.classList.add(q.get('kind'));
+    // Search results: the same as the header (the App Store prints the icon and name right above it, and crops it too).
+    if (q.get('kind') === 'search') document.body.classList.add('header');
     if (q.get('wide')) document.body.classList.add('wide');
     // "Recommendation" is a long word: shrink the title until it fits its side, with room to spare.
     const h1 = document.querySelector('h1'), text = document.querySelector('.text');
