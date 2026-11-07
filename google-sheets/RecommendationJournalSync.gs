@@ -34,6 +34,12 @@
  */
 const SCRIPT_VERSION = 6;
 
+/**
+ * Which app this sheet is for. Sleep Journal's template looks much the same (a web app URL and a
+ * secret key), so every answer says this, and each app turns away the other's sheet.
+ */
+const APP = 'recommendation-journal';
+
 const CATEGORIES_TAB = 'Categories';
 const DELETED_TAB = 'Deleted';
 const UPDATED = 'Updated';
@@ -106,7 +112,7 @@ function doPost(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     // url: this spreadsheet's own address, for the app's "Open sheet" button. Opening it still needs your Google login.
-    if (req.action === 'ping') return json_({ ok: true, sheet: ss.getName(), url: ss.getUrl(), version: SCRIPT_VERSION });
+    if (req.action === 'ping') return json_({ ok: true, app: APP, sheet: ss.getName(), url: ss.getUrl(), version: SCRIPT_VERSION });
     if (req.action === 'sync') return json_(sync_(ss, req));
     return json_({ ok: false, error: 'Unknown action' });
   } catch (err) {
@@ -145,7 +151,7 @@ function sync_(ss, req) {
   orderTabs_(ctx, cats, tabs);
   removeEmptyDefaultSheet_(ctx);
 
-  const out = { ok: true, written: written, aliases: aliases, categories: cats, sheet: ss.getName(), url: ss.getUrl(), version: SCRIPT_VERSION };
+  const out = { ok: true, app: APP, written: written, aliases: aliases, categories: cats, sheet: ss.getName(), url: ss.getUrl(), version: SCRIPT_VERSION };
   if (req.pull) {
     const pulled = pull_(ctx, tabs, String(req.since || ''), !!req.full);
     out.items = pulled.items;
