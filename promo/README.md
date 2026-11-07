@@ -10,6 +10,8 @@ upload. All the recommendations shown are made up (see `source/demo.csv`).
 You can change this one any time, without sending a new version for review.
 
 ```
+Alexis: Remember what people recommend to you (movies, video games, albums, and more), and why.
+
 Never forget a recommendation again. One box searches your list and adds new things. Rank what's next, rate what you've tried, and see who told you about it.
 ```
 
@@ -18,12 +20,24 @@ Never forget a recommendation again. One box searches your list and adds new thi
 Shown under the app's name. It's in the App Information section, not the version page.
 
 ```
+Alexis: 
 Remember who told you, and why
 ```
 
 ### Description
 
 ```
+- Alexis:
+Remember what people recommend to you and why: movies, video games, albums, and more.
+
+Free and open-source. The journal stays on your device. No account, no ads, no tracking. You can sync your data between devices using Google Sheet.
+
+Preview music: "Inspired" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+
+ - Claude
+
 A friend swears by a book. A coworker says you have to see a show. Someone on a train writes a game's name on your ticket. Recommendation Journal is the one place to keep all of it, along with who told you and why.
 
 ONE BOX DOES IT ALL
@@ -80,6 +94,9 @@ Apple adds the © itself.
 ```
 2026 Alexis Drain
 ```
+
+## Reviewer Notes
+No account or sign-in is needed: everything is stored on the device. Syncing with a Google Sheet (Settings → Google Sheet) is optional and needs the user’s own Google Sheet; the rest of the app works fully without it.
 
 ## Pictures and videos
 

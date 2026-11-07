@@ -12,11 +12,10 @@ interface Props {
   selected: string | 'all';
   onSelect: (uid: string | 'all') => void;
   onNew: () => void;
-  /** Leave out "Priority", "+ New category" and "Recently deleted" (the Sheet tab: All and the categories). */
-  plain?: boolean;
 }
 
-function Tab({ label, icon, iconColor, count, selected, onPress, color = colors.text }: {
+/** One row in the list of categories (also used by the Sheet's dropdown). */
+export function Tab({ label, icon, iconColor, count, selected, onPress, color = colors.text }: {
   label: string; icon?: string; iconColor?: string; count?: number; selected?: boolean; onPress: () => void; color?: string;
 }) {
   return (
@@ -36,22 +35,20 @@ function Tab({ label, icon, iconColor, count, selected, onPress, color = colors.
   );
 }
 
-export function CategoryTabs({ categories, counts, selected, onSelect, onNew, plain }: Props) {
+export function CategoryTabs({ categories, counts, selected, onSelect, onNew }: Props) {
   return (
     <View accessibilityRole="tablist" style={{ gap: 2 }}>
       <Tab label="All" count={counts.get('all') ?? 0} selected={selected === 'all'} onPress={() => onSelect('all')} />
-      {!plain && <Tab label="Priority" icon="★" iconColor={colors.warm} count={counts.get('upnext') ?? 0} selected={selected === 'upnext'} onPress={() => onSelect('upnext')} />}
+      <Tab label="Priority" icon="★" iconColor={colors.warm} count={counts.get('upnext') ?? 0} selected={selected === 'upnext'} onPress={() => onSelect('upnext')} />
       {categories.map((c) => (
         <Tab key={c.uid} label={c.name} count={counts.get(c.uid) ?? 0} selected={selected === c.uid} onPress={() => onSelect(c.uid)} />
       ))}
-      {!plain && <Tab label="+ New category" color={colors.warm} onPress={onNew} />}
+      <Tab label="+ New category" color={colors.warm} onPress={onNew} />
       {/* Always last, a little apart: not a category of its own, just what you deleted lately. */}
-      {!plain && (
-        <View style={{ marginTop: space.sm, borderTopWidth: 1, borderTopColor: colors.cardBorder, paddingTop: space.sm }}>
-          <Tab label="🗑 Recently deleted" count={counts.get('deleted') ?? 0} selected={selected === 'deleted'}
-            onPress={() => onSelect('deleted')} color={colors.muted} />
-        </View>
-      )}
+      <View style={{ marginTop: space.sm, borderTopWidth: 1, borderTopColor: colors.cardBorder, paddingTop: space.sm }}>
+        <Tab label="🗑 Recently deleted" count={counts.get('deleted') ?? 0} selected={selected === 'deleted'}
+          onPress={() => onSelect('deleted')} color={colors.muted} />
+      </View>
     </View>
   );
 }
