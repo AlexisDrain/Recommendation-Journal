@@ -19,7 +19,7 @@ import { useThemeName } from '@/lib/displayMode';
 import { colors, space } from '@/lib/theme';
 import { useWide } from '@/lib/useLayout';
 
-const ALL_COLUMNS: SheetColumn[] = ['Title', 'Category', ...COLUMNS.slice(1)];
+const ALL_COLUMNS: SheetColumn[] = ['Category', ...COLUMNS];
 
 export default function SheetScreen() {
   useThemeName(); // redraw when the display changes

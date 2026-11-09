@@ -22,7 +22,7 @@ const PUSH_BATCH = 300;
 /** A phone can suspend the app mid-request: without a limit, that sync would block all later ones. */
 const REQUEST_TIMEOUT_MS = 90_000;
 /** The version of google-sheets/RecommendationJournalSync.gs this app was built for (its SCRIPT_VERSION). */
-export const LATEST_SCRIPT_VERSION = 6;
+export const LATEST_SCRIPT_VERSION = 8;
 
 export interface Connection { url: string; secret: string }
 
@@ -401,7 +401,7 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
       const fields = rowFields(mapHeader(header), header.map((h) => r.cells[h]), local.get(r.category), false);
       if (!fields) continue;
       const merged = mergeItem(mine, {
-        categoryUid: r.category, deleted: false, ...fields, author: fields.author ?? mine?.author ?? '',
+        categoryUid: r.category, deleted: false, ...fields, author: fields.author ?? mine?.author ?? '', series: fields.series ?? mine?.series ?? '',
         queuePos: fields.queuePos !== undefined ? fields.queuePos : mine?.queuePos ?? null,
         manualPos: fields.manualPos ?? mine?.manualPos ?? null,
       }, keep);

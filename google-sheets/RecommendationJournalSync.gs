@@ -32,7 +32,7 @@
  * Bump this whenever the script changes in a way the app should know about. The app compares it
  * with the version it was built for and tells the user when their sheet's script is out of date.
  */
-const SCRIPT_VERSION = 6;
+const SCRIPT_VERSION = 8;
 
 /**
  * Which app this sheet is for. Sleep Journal's template looks much the same (a web app URL and a
@@ -49,8 +49,8 @@ const CHANGED = 'Changed';
 // "List order": your own order in the app ("My order"; higher comes first). Hidden, like Changed.
 const ORDER = 'List order';
 const CAT_COLS = ['Id', 'Name', 'One is called', 'On your list', 'Done', 'Order', 'Hidden', 'Deleted', UPDATED];
-const ITEM_COLS = ['Title', 'Author', 'Status', 'Priority', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on', 'Id', UPDATED, CHANGED, ORDER];
-const ITEM_WIDTHS = [260, 180, 130, 70, 130, 160, 320, 120, 120, 130, 160, 160, 90];
+const ITEM_COLS = ['Title', 'Series', 'Author', 'Status', 'Priority', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on', 'Id', UPDATED, CHANGED, ORDER];
+const ITEM_WIDTHS = [260, 160, 180, 130, 70, 130, 160, 320, 120, 120, 130, 160, 160, 90];
 const RATINGS = ['❌ Bad', '✅ Average', '👍 Great', '❤️ Exceptional'];
 const HEADER_COLOR = '#c9cdf5';
 const SYSTEM_COLOR = '#e4e6f2'; // Id / Updated: the app's bookkeeping
@@ -449,7 +449,7 @@ function readTab_(t, shown) {
   const get = function () { return shown ? t.sh.getDataRange().getDisplayValues() : t.sh.getDataRange().getValues(); };
   let all = get();
   let headers = (all[0] || []).map(function (h) { return String(h).trim(); });
-  if (ITEM_COLS.some(function (h) { return headers.indexOf(h) < 0; })) {
+  if (ITEM_COLS.some(function (h) { return headers.indexOf(h) < 0; }) || seriesAtEnd_(headers)) {
     ensureItemColumns_(t.sh);
     all = get();
     headers = all[0].map(function (h) { return String(h).trim(); });
@@ -627,7 +627,10 @@ function newItemTab_(ctx, name) {
   return t;
 }
 
-/** Adds any missing columns at the end (your own columns stay where they are), as plain text. */
+/**
+ * Adds any missing columns, as plain text: right after the column it follows in a new tab
+ * (Series after Title) when that one is there, otherwise at the end. Your own columns stay as they are.
+ */
 function ensureItemColumns_(sh) {
   const headers = sh.getLastColumn() ? headers_(sh) : [];
   // "Priority" was called "Up next" before version 6: rename that column where it is.
@@ -636,12 +639,28 @@ function ensureItemColumns_(sh) {
     sh.getRange(1, old + 1).setValue('Priority');
     headers[old] = 'Priority';
   }
+  // Version 7 put Series at the far end (after Id): move it to its place after Title. One you put
+  // somewhere yourself stays there.
+  if (seriesAtEnd_(headers)) {
+    const series = headers.indexOf('Series'), title = headers.indexOf('Title');
+    sh.moveColumns(sh.getRange(1, series + 1, 1, 1), title + 2);
+    headers.splice(series, 1);
+    headers.splice(title + 1, 0, 'Series');
+  }
   ITEM_COLS.forEach(function (h, i) {
     if (headers.indexOf(h) >= 0) return;
-    const at = headers.length + 1;
-    if (sh.getMaxColumns() < at) sh.insertColumnsAfter(sh.getMaxColumns(), at - sh.getMaxColumns());
-    headers[at - 1] = h;
     const system = h === 'Id' || h === UPDATED || h === CHANGED || h === ORDER;
+    const before = i > 0 && !system ? headers.indexOf(ITEM_COLS[i - 1]) : -1;
+    let at;
+    if (before >= 0 && before < headers.length - 1) {
+      at = before + 2;
+      sh.insertColumnAfter(before + 1); // moves the columns after it one to the right
+      headers.splice(at - 1, 0, h);
+    } else {
+      at = headers.length + 1;
+      if (sh.getMaxColumns() < at) sh.insertColumnsAfter(sh.getMaxColumns(), at - sh.getMaxColumns());
+      headers[at - 1] = h;
+    }
     sh.getRange(1, at).setValue(h).setFontWeight('bold').setBackground(system ? SYSTEM_COLOR : HEADER_COLOR);
     const body = sh.getRange(2, at, Math.max(sh.getMaxRows() - 1, 1), 1);
     body.setNumberFormat('@'); // text: stops Sheets turning dates and "1/2" into something else
@@ -651,6 +670,12 @@ function ensureItemColumns_(sh) {
     if (h === 'Id') sh.getRange(1, at).setNote('Leave Id, Updated and Changed alone: the app uses them to keep this sheet and your devices in step.');
     if (h === CHANGED || h === ORDER) sh.hideColumns(at);
   });
+}
+
+/** True when Series is past the Id column, where version 7 added it. */
+function seriesAtEnd_(headers) {
+  const series = headers.indexOf('Series');
+  return series >= 0 && headers.indexOf('Title') >= 0 && headers.indexOf('Id') >= 0 && series > headers.indexOf('Id');
 }
 
 function headers_(sh) {

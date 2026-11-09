@@ -23,6 +23,23 @@ const UNSYNCED_FIELDS: [string, string][] = [
   ['queuePos', 'queue_pos'], ['manualPos', 'manual_pos'], ['deleted', 'deleted'],
 ];
 
+/** The two triggers that keep `items.unsynced` (see migration 10), for these fields. */
+const unsyncedTriggers = (fields: [string, string][]) => `
+  CREATE TRIGGER items_unsynced AFTER UPDATE ON items WHEN NEW.unsynced = OLD.unsynced
+  BEGIN
+    UPDATE items SET unsynced = trim(OLD.unsynced
+      ${fields.map(([field, column]) =>
+        `|| CASE WHEN NEW.${column} IS NOT OLD.${column} AND instr(' ' || OLD.unsynced || ' ', ' ${field} ') = 0 THEN ' ${field}' ELSE '' END`).join(' ')})
+    WHERE id = NEW.id;
+  END;
+  -- Something new made here: all of it still has to reach the sheet. (A sync can't go by time
+  -- alone: what it merges is given a time after the sheet's, which can be ahead of this clock.)
+  CREATE TRIGGER items_unsynced_new AFTER INSERT ON items
+  BEGIN
+    UPDATE items SET unsynced = '${fields.map(([field]) => field).join(' ')}' WHERE id = NEW.id;
+  END;
+`;
+
 export const MIGRATIONS: string[] = [
   // 1 — initial schema
   `
@@ -153,19 +170,22 @@ export const MIGRATIONS: string[] = [
   // came from the sheet, and empties it once the change has been sent.
   `
   ALTER TABLE items ADD COLUMN unsynced TEXT NOT NULL DEFAULT '';
-  CREATE TRIGGER items_unsynced AFTER UPDATE ON items WHEN NEW.unsynced = OLD.unsynced
-  BEGIN
-    UPDATE items SET unsynced = trim(OLD.unsynced
-      ${UNSYNCED_FIELDS.map(([field, column]) =>
-        `|| CASE WHEN NEW.${column} IS NOT OLD.${column} AND instr(' ' || OLD.unsynced || ' ', ' ${field} ') = 0 THEN ' ${field}' ELSE '' END`).join(' ')})
-    WHERE id = NEW.id;
-  END;
-  -- Something new made here: all of it still has to reach the sheet. (A sync can't go by time
-  -- alone: what it merges is given a time after the sheet's, which can be ahead of this clock.)
-  CREATE TRIGGER items_unsynced_new AFTER INSERT ON items
-  BEGIN
-    UPDATE items SET unsynced = '${UNSYNCED_FIELDS.map(([field]) => field).join(' ')}' WHERE id = NEW.id;
-  END;
+  ${unsyncedTriggers(UNSYNCED_FIELDS)}
+  `,
+
+  // 11 — the series something belongs to ("Dune"), under its author. It's a field a sync sends,
+  // so the triggers from 10 are made again with it.
+  `
+  ALTER TABLE items ADD COLUMN series TEXT NOT NULL DEFAULT '';
+  DROP TRIGGER items_unsynced;
+  DROP TRIGGER items_unsynced_new;
+  ${unsyncedTriggers([...UNSYNCED_FIELDS, ['series', 'series']])}
+  `,
+
+  // 12 — something new goes on top of "My order" (the highest place + 1). Without an index that
+  // read the whole list for every entry added, so importing thousands of rows took minutes.
+  `
+  CREATE INDEX items_manual_pos_idx ON items (manual_pos);
   `,
 ];
 

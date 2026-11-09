@@ -21,6 +21,7 @@ Never forget a recommendation again. One box searches your list and adds new thi
 Shown under the app's name. It's in the App Information section, not the version page.
 
 ```
+Alexis: Save friends' recommendations
 Alexis: Recommendations from friends
 Alexis: Catalog media you want to see.
 Remember who told you, and why

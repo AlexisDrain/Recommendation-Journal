@@ -9,12 +9,12 @@ import { parseDate } from '@/lib/dates';
 import { parseRating, ratingText } from '@/lib/rating';
 import type { Category, Item, Status } from '@/lib/types';
 
-export const COLUMNS = ['Title', 'Author', 'Status', 'Priority', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on'] as const;
+export const COLUMNS = ['Title', 'Series', 'Author', 'Status', 'Priority', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on'] as const;
 /** Kept in the Google Sheet (hidden) but not shown in the app's Sheet tab or the exports. */
 export const ORDER_COLUMN = 'List order';
 export type Column = (typeof COLUMNS)[number];
 export const WIDTHS: Record<Column, number> = {
-  Title: 36, Author: 22, Status: 16, Priority: 9, Rating: 16, 'Recommended by': 22, Why: 48, 'Recommended on': 15, 'Experienced on': 15,
+  Title: 36, Series: 20, Author: 22, Status: 16, Priority: 9, Rating: 16, 'Recommended by': 22, Why: 48, 'Recommended on': 15, 'Experienced on': 15,
 };
 
 /** One item as the cells of a row. */
@@ -22,6 +22,7 @@ export function itemCells(it: Item, cat: Pick<Category, 'wantLabel' | 'doneLabel
   return {
     Title: it.title,
     Author: it.author,
+    Series: it.series,
     Status: it.status === 'done' ? cat?.doneLabel || 'Done' : cat?.wantLabel || 'Want to',
     Priority: it.queuePos != null ? String(it.queuePos) : '',
     Rating: ratingText(it.rating),
@@ -37,6 +38,7 @@ const ALIASES: Record<Column | 'Category', string[]> = {
   Title: ['title', 'name', 'media', 'media name', 'item', 'book', 'movie', 'film', 'game', 'show', 'album', 'recipe', 'what'],
   Author: ['author', 'creator', 'director', 'artist', 'writer', 'written by', 'directed by', 'made by', 'developer', 'studio',
     'band', 'musician', 'chef', 'host'],
+  Series: ['series', 'saga', 'franchise', 'collection', 'universe', 'part of'],
   Priority: ['priority', 'up next', 'queue', 'rank', 'ranking', 'watch soon', 'read soon', 'next'],
   Status: ['status', 'state', 'seen', 'done', 'watched', 'read', 'played', 'finished', 'have i'],
   Rating: ['rating', 'rated', 'score', 'stars', 'exceptional', 'my rating', 'verdict', 'opinion', 'liked it'],
@@ -96,8 +98,8 @@ export function parseStatus(raw: string, cat: Pick<Category, 'wantLabel' | 'done
 export const MAX_TEXT = 20_000;
 const clip = (v: string) => v.slice(0, MAX_TEXT);
 
-/** `author` / `queuePos` are left out when the row has no such column (an older sheet), so they aren't wiped. */
-export type RowFields = { author?: string; queuePos?: number | null; manualPos?: number | null } & Pick<Item, 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>;
+/** `author`, `series` and `queuePos` are left out when the row has no such column (an older sheet), so they aren't wiped. */
+export type RowFields = { author?: string; series?: string; queuePos?: number | null; manualPos?: number | null } & Pick<Item, 'title' | 'status' | 'rating' | 'recommendedBy' | 'note' | 'recommendedOn' | 'doneOn'>;
 
 /**
  * A row's cells → an item's fields, or null for a row without a title.
@@ -122,6 +124,7 @@ export function rowFields(map: HeaderMap, row: string[], cat: Pick<Category, 'wa
   return {
     title: clip(title),
     ...(map.col.Author !== undefined && { author: clip(get('Author')) }),
+    ...(map.col.Series !== undefined && { series: clip(get('Series')) }),
     ...(map.order !== undefined && { manualPos: Number.isFinite(Number(row[map.order])) && String(row[map.order]).trim() !== '' ? Number(row[map.order]) : null }),
     ...(map.col.Priority !== undefined && { queuePos: /^\d+$/.test(get('Priority')) && Number(get('Priority')) > 0 ? Number(get('Priority')) : null }),
     status: parseStatus(get('Status'), cat, { rating: !!rating, doneOn: !!doneOn }),

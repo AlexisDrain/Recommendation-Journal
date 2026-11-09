@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 import { colors, space } from '@/lib/theme';
+import { rowSet } from './sortableRows';
 
 export function SortableList<T>({ data, keyOf, renderRow, onReorder, label, wholeRow = false }: {
   data: T[];
@@ -26,6 +27,7 @@ export function SortableList<T>({ data, keyOf, renderRow, onReorder, label, whol
   );
   return (
     <Sortable.Grid
+      key={rowSet(data, keyOf) /* starts afresh when a row is added or removed: see sortableRows.ts */}
       columns={1}
       data={data}
       keyExtractor={keyOf}

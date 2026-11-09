@@ -6,10 +6,12 @@ import { RATINGS, ratingEmoji } from '@/lib/rating';
 import { colors, radius, space } from '@/lib/theme';
 import type { Category, Item } from '@/lib/types';
 
-export const ItemRow = memo(function ItemRow({ item, category, showCategory, onPress, flush, hasDraft }: {
+export const ItemRow = memo(function ItemRow({ item, category, showCategory, showSeries = true, onPress, flush, hasDraft }: {
   item: Item;
   category?: Category;
   showCategory: boolean;
+  /** Leave out the series (the Series page already shows it above). */
+  showSeries?: boolean;
   onPress: (item: Item) => void;
   /** No space below (in a list that spaces its rows itself). */
   flush?: boolean;
@@ -18,6 +20,7 @@ export const ItemRow = memo(function ItemRow({ item, category, showCategory, onP
 }) {
   const done = item.status === 'done';
   const meta = [
+    showSeries && item.series,
     item.author && `by ${item.author}`,
     showCategory && category?.name,
     done ? `${category?.doneLabel ?? 'Done'}${item.doneOn ? ` ${formatDate(item.doneOn)}` : ''}` : category?.wantLabel,

@@ -44,6 +44,25 @@ class Sheet {
   getMaxColumns() { return this.maxCols; }
   insertRowsAfter(_, n) { this.maxRows += n; }
   insertColumnsAfter(_, n) { this.maxCols += n; }
+  insertColumnAfter(after) {
+    const moved = new Map();
+    for (const [k, v] of this.cells) { const [r, c] = k.split(':').map(Number); moved.set(this.key(r, c > after ? c + 1 : c), v); }
+    this.cells = moved;
+    this.maxCols += 1;
+  }
+  // Like Google's: moves the range's columns so they sit before column `dest` (counted before the move).
+  moveColumns(range, dest) {
+    const from = range.c, n = range.nc;
+    const order = [];
+    const last = Math.max(this.getLastColumn(), dest);
+    for (let c = 1; c <= last; c++) if (c < from || c >= from + n) order.push(c);
+    const at = order.findIndex((c) => c >= dest);
+    order.splice(at < 0 ? order.length : at, 0, ...Array.from({ length: n }, (_, k) => from + k));
+    const place = new Map(order.map((c, i) => [c, i + 1]));
+    const moved = new Map();
+    for (const [k, v] of this.cells) { const [r, c] = k.split(':').map(Number); moved.set(this.key(r, place.get(c) ?? c), v); }
+    this.cells = moved;
+  }
   hideColumns() {}
   setColumnWidth() {}
   setColumnWidths() {}

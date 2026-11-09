@@ -8,6 +8,9 @@ const STUBS = {
   'expo-secure-store': stub('securestore'),
   '@react-native-async-storage/async-storage': stub('storage'),
   'react-native': stub('rn'),
+  'expo-document-picker': stub('empty'),
+  'expo-file-system': stub('empty'),
+  'expo-sharing': stub('empty'),
 };
 
 registerHooks({

@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { UpdateBar } from '@/components/UpdateBar';
 import { requestSync, syncIfWaiting } from '@/db/sync';
 import { useDisplayModeLoaded, useThemeName } from '@/lib/displayMode';
 import { useLatestUpdate } from '@/lib/latestUpdate';
@@ -16,7 +17,7 @@ export default function RootLayout() {
   const theme = useThemeName();
   const displayLoaded = useDisplayModeLoaded();
   const welcomeSeen = useWelcomeSeen();
-  useLatestUpdate(); // phones: switch to a new release as soon as it's downloaded
+  useLatestUpdate(); // phones: look for a new release, and offer it once it's downloaded (UpdateBar)
 
   // Pick up changes from the Google Sheet (if connected) on launch and when the app comes back.
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function RootLayout() {
         </Stack.Protected>
       </Stack>
       </ThemeProvider>
+      <UpdateBar />
     </GestureHandlerRootView>
   );
 }

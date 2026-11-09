@@ -7,6 +7,7 @@ import { colors, space } from '@/lib/theme';
 import type { Category } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
 import { formContent, formHeader, Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
+import { saveCategory } from './saveCategory';
 import { Button, Muted, Row } from './ui';
 
 interface Props {
@@ -44,12 +45,7 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
     setBusy(true);
     setError(null);
     try {
-      if (category) {
-        await store.categories.update(category.uid, draft);
-        onSaved?.({ ...category, ...draft });
-      } else {
-        onSaved?.(await store.categories.create(draft));
-      }
+      await saveCategory(draft, category, onSaved);
       onClose();
     } catch (e) {
       setError((e as Error).message);

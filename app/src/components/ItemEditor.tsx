@@ -9,11 +9,11 @@ import { withArticle } from '@/lib/categories';
 import { today } from '@/lib/dates';
 import { dropDraft, getDraft, keepDraft } from '@/lib/drafts';
 import { RATINGS } from '@/lib/rating';
-import { hasTitle, people } from '@/lib/search';
+import { hasTitle, people, seriesSuggestions } from '@/lib/search';
 import { colors, radius, space } from '@/lib/theme';
 import type { Item, Rating, Status } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
-import { DateField } from './DateField';
+import { DATE_WIDTH, DateField } from './DateField';
 import { formContent, formHeader, Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
 import { Button, Chip, Input, styles } from './ui';
 
@@ -24,6 +24,7 @@ const MOST_USED = 6;
 export interface ItemDraft {
   title: string;
   author: string;
+  series: string;
   categoryUid: string;
   status: Status;
   rating: Rating | null;
@@ -63,7 +64,7 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
   const shown = categories.filter((c) => !c.hidden || c.uid === item?.categoryUid);
   // What the panel shows without a draft: the saved item, or a new one with its defaults.
   const [base] = useState<ItemDraft>(() => item ? { ...item, upNext: item.queuePos != null } : {
-    title: '', author: '', categoryUid: shown[0]?.uid ?? '', status: 'want', rating: null, recommendedBy: '', note: '',
+    title: '', author: '', series: '', categoryUid: shown[0]?.uid ?? '', status: 'want', rating: null, recommendedBy: '', note: '',
     recommendedOn: today(), doneOn: null, ...start,
   });
   // A draft left here before (closed without saving). For a new one, only if it's the same title
@@ -76,6 +77,7 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
   const [draft, setDraft] = useState<ItemDraft>(() => (restored ? { ...base, ...(restored.fields as Partial<ItemDraft>) } : base));
   const [newCategory, setNewCategory] = useState<CategoryDraft | null>(() => (restored?.newCategory as CategoryDraft | null) ?? null);
   const [busy, setBusy] = useState(false);
+  const [datesWidth, setDatesWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const everyone = useMemo(() => people(items), [items]);
   // Many categories would fill the panel with chips: past FEW_CATEGORIES, show the chosen one and
@@ -96,6 +98,8 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
     : categories.find((c) => c.uid === draft.categoryUid);
   const duplicate = !item && !newCategory && hasTitle(items, draft.title, draft.categoryUid);
   const typed = draft.recommendedBy.trim().toLowerCase();
+  // Series you've used before that match what's typed: none until you type a letter.
+  const seriesIdeas = useMemo(() => seriesSuggestions(items, draft.series), [items, draft.series]);
   const suggestions = everyone.filter((p) => p.toLowerCase() !== typed && (!typed || p.toLowerCase().includes(typed))).slice(0, 8);
 
   const save = async () => {
@@ -184,6 +188,13 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       <Input placeholder="Title" value={draft.title} onChangeText={(title) => set({ title })} maxLength={MAX_TEXT}
         autoFocus={!item && !draft.title} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Title" />
       {duplicate && <Text style={{ color: colors.warm }}>Already on your list in this category.</Text>}
+      <Input placeholder="Series, like Dune book series" value={draft.series}
+        onChangeText={(series) => set({ series })} maxLength={MAX_TEXT} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Series" />
+      {seriesIdeas.length > 0 && (
+        <View style={styles.chips}>
+          {seriesIdeas.map((name) => <Chip key={name} label={name} onPress={() => set({ series: name })} />)}
+        </View>
+      )}
       <Input placeholder="Author (or director, artist…), like Stephen King" value={draft.author}
         onChangeText={(author) => set({ author })} maxLength={MAX_TEXT} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
 
@@ -222,36 +233,45 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       <Input placeholder="Why? What did they say about it?" value={draft.note} onChangeText={(note) => set({ note })} maxLength={MAX_TEXT}
         multiline onFocus={reveal} accessibilityLabel="Why it was recommended" />
 
-      <Section n={n()} title={`${category?.doneLabel || 'Done'} it? When?`} />
+      {/* Where it stands: on your list or done, how it was, and whether it's a priority. */}
+      <Section n={n()} title="Status" />
       <View style={styles.chips}>
         <Chip label={category?.wantLabel || 'Want to'} selected={draft.status === 'want'} color={colors.warm}
           onPress={() => set({ status: 'want', rating: null })} />
         <Chip label={category?.doneLabel || 'Done'} selected={draft.status === 'done'} color={colors.success}
           onPress={() => set({ status: 'done', doneOn: draft.doneOn ?? today() })} />
       </View>
-      <View style={[styles.chips, { alignItems: 'center' }]}>
-        <Text style={{ color: colors.muted, marginRight: space.xs }}>Your rating</Text>
+      <Label>Your rating</Label>
+      <View style={styles.chips}>
         {RATINGS.map((r) => (
           <Chip key={r.value} label={`${r.emoji} ${r.label}`} selected={draft.rating === r.value}
             onPress={() => draft.rating === r.value ? set({ rating: null })
               : set({ rating: r.value, status: 'done', doneOn: draft.doneOn ?? today() })} />
         ))}
       </View>
-      <DateField label="Recommended on" value={draft.recommendedOn} onChange={(recommendedOn) => set({ recommendedOn })} />
-      {draft.status === 'done' && (
-        <DateField label={`${category?.doneLabel || 'Done'} on`} value={draft.doneOn} onChange={(doneOn) => set({ doneOn })} />
-      )}
-
       {/* Priority: a pin on the thing itself, apart from its status. Done things aren't on it. */}
       {draft.status === 'want' && (
         <>
-          <Section n={n()} title="Want to experience soon?" />
+          <Label>Want to get to it soon?</Label>
           <View style={styles.chips}>
             <Chip label={draft.upNext ? `★ Priority${item?.queuePos ? ` #${item.queuePos}` : ''}` : '☆ Make it a priority'} selected={!!draft.upNext}
               color={colors.warm} onPress={() => set({ upNext: !draft.upNext })} />
           </View>
         </>
       )}
+
+      <Section n={n()} title="Dates" />
+      {/* Side by side when there's room; one above the other on a narrow phone. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}
+        onLayout={(e) => setDatesWidth(e.nativeEvent.layout.width)}>
+        <DateField label="Recommended on" value={draft.recommendedOn} onChange={(recommendedOn) => set({ recommendedOn })} />
+        {draft.status === 'done' ? (
+          <DateField label={`${category?.doneLabel || 'Done'} on`} value={draft.doneOn} onChange={(doneOn) => set({ doneOn })} />
+        ) : datesWidth >= 2 * DATE_WIDTH + space.md && (
+          // Holds the done date's place, so "Recommended on" stays half wide (when two would fit).
+          <View style={{ flexGrow: 1, flexBasis: DATE_WIDTH }} />
+        )}
+      </View>
 
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
       {/* Unsaved changes (just made, or a draft kept from before): throw them away. */}
@@ -270,6 +290,11 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       </View>
     </ScrollView>
   );
+}
+
+/** A small label above a row of choices inside a section: "Your rating". */
+function Label({ children }: { children: string }) {
+  return <Text style={{ color: colors.muted, fontSize: 14, marginBottom: -space.xs }}>{children}</Text>;
 }
 
 /** A numbered section title in the panel: "1. What is it?" */

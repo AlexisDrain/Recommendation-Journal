@@ -34,6 +34,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Recommendations', tabBarLabel: 'List', tabBarIcon: ({ color }) => <TabIcon glyph="★" color={color} /> }} />
+      <Tabs.Screen name="series" options={{ title: 'Series', tabBarIcon: ({ color }) => <TabIcon glyph="❐" color={color} /> }} />
       <Tabs.Screen name="categories" options={{ title: 'Categories', tabBarIcon: ({ color }) => <TabIcon glyph="☰" color={color} /> }} />
       <Tabs.Screen name="sheet" options={{ title: 'Sheet', tabBarIcon: ({ color }) => <TabIcon glyph="▦" color={color} /> }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color }) => <TabIcon glyph="⚙" color={color} /> }} />

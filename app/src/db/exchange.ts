@@ -3,7 +3,9 @@
 //   .csv  — one table with a Category column, for backups and moving to a new device.
 // Import reads both, and also spreadsheets made by hand: columns are matched by name ("Title" or
 // "Name", "Notes", "Year read"…) and each tab without a Category column becomes a category named
-// after the tab. Things already on your list (same title in the same category) are skipped.
+// after the tab. A row for something already on your list (same Id, or same title in the same
+// category) adds nothing new: it only fills in what that entry leaves empty (a series, the author,
+// a rating…). What you've filled in yourself is never overwritten.
 import * as DocumentPicker from 'expo-document-picker';
 import { categoryKey, normalize, suggestWords } from '@/lib/categories';
 import { stamp, today } from '@/lib/dates';
@@ -99,7 +101,21 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-export interface ImportResult { added: number; skipped: number; categoriesAdded: string[] }
+/** `updated`: already on your list, and the file filled in some of its empty fields. */
+export interface ImportResult { added: number; updated: number; skipped: number; categoriesAdded: string[] }
+
+/** The fields an import may fill in on an entry you already have, when that entry leaves them empty. */
+const FILLABLE = ['author', 'series', 'recommendedBy', 'note', 'rating', 'recommendedOn', 'doneOn'] as const;
+const isEmpty = (v: unknown) => v === null || v === undefined || v === '';
+
+/** What `fields` would fill in on `item`: only the fields `item` leaves empty. */
+export function emptyFieldsFilled(item: Item, fields: Partial<Pick<Item, (typeof FILLABLE)[number]>>): Partial<Item> {
+  const fill: Partial<Item> = {};
+  for (const k of FILLABLE) {
+    if (isEmpty(item[k]) && !isEmpty(fields[k])) (fill as Record<string, unknown>)[k] = fields[k];
+  }
+  return fill;
+}
 
 /** Tab names that say nothing about what's in them. */
 const GENERIC_TAB = /^(sheet|tab|page|table|feuille|blatt|hoja)\s*\d*$/i;
@@ -113,8 +129,11 @@ export async function importTables(tables: { name: string; rows: string[][] }[],
   const categories = (await allCategories()).filter((c) => !c.deleted);
   const existing = (await allItems()).filter((i) => !i.deleted);
   const uids = new Set((await allItems()).map((i) => i.uid));
-  const seen = new Set(existing.map((i) => `${i.categoryUid}\n${normalize(i.title)}`));
-  const result: ImportResult = { added: 0, skipped: 0, categoriesAdded: [] };
+  const byUid = new Map(existing.map((i) => [i.uid, i]));
+  const byKey = new Map(existing.map((i) => [`${i.categoryUid}\n${normalize(i.title)}`, i]));
+  const seen = new Set(byKey.keys());
+  const filled = new Set<string>(); // entries this import already filled in (a file may list one twice)
+  const result: ImportResult = { added: 0, updated: 0, skipped: 0, categoriesAdded: [] };
   const now = stamp();
   let order = categories.reduce((m, c) => Math.max(m, c.sortOrder), 0);
 
@@ -145,14 +164,23 @@ export async function importTables(tables: { name: string; rows: string[][] }[],
         const key = `${category.uid}\n${normalize(fields.title)}`;
         const id = idCol >= 0 ? String(row[idCol] ?? '').trim() : '';
         if (seen.has(key) || (id && uids.has(id))) {
-          result.skipped++;
+          // Already on your list: fill in only what it leaves empty.
+          const mine = (id && byUid.get(id)) || byKey.get(key);
+          const fill = mine && !filled.has(mine.uid) ? emptyFieldsFilled(mine, fields) : {};
+          if (mine && Object.keys(fill).length) {
+            await writeItem(tx, { ...mine, ...fill, updatedAt: now });
+            filled.add(mine.uid);
+            result.updated++;
+          } else {
+            result.skipped++;
+          }
           continue;
         }
         seen.add(key);
         // A backup's own ids are kept, so restoring it doesn't duplicate rows in the Google Sheet.
         const uid = /^[\w-]{6,64}$/.test(id) ? id : newUid();
         uids.add(uid);
-        await writeItem(tx, { uid, categoryUid: category.uid, deleted: false, updatedAt: now, ...fields, author: fields.author ?? '', queuePos: fields.queuePos ?? null });
+        await writeItem(tx, { uid, categoryUid: category.uid, deleted: false, updatedAt: now, ...fields, author: fields.author ?? '', series: fields.series ?? '', queuePos: fields.queuePos ?? null });
         result.added++;
       }
     }

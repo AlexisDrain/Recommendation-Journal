@@ -16,6 +16,7 @@ export const DeletedRow = memo(function DeletedRow({ item, category, onRestore }
   const deletedAt = new Date(item.updatedAt); // stamped in UTC: shown as your own date
   const left = DELETED_DAYS - Math.floor((Date.now() - deletedAt.getTime()) / 86_400_000);
   const meta = [
+    item.series,
     item.author && `by ${item.author}`,
     category && `${category.name}${category.deleted ? ' (deleted too: restoring brings it back)' : ''}`,
     `deleted ${formatDate(toDateString(deletedAt))}`,

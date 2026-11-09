@@ -16,7 +16,7 @@ function indexFor(items: Item[], categories: Category[]): Entry[] {
   const names = new Map(categories.map((c) => [c.uid, c.name]));
   const index = items.map((item) => {
     const title = normalize(item.title);
-    const rest = normalize(`${item.author} ${item.recommendedBy} ${item.note} ${names.get(item.categoryUid) ?? ''}`);
+    const rest = normalize(`${item.author} ${item.series} ${item.recommendedBy} ${item.note} ${names.get(item.categoryUid) ?? ''}`);
     return { item, title, titleWords: title.split(' '), words: [...title.split(' '), ...rest.split(' ')] };
   });
   cache = { items, categories, index };
@@ -61,4 +61,44 @@ export function people(items: Item[]): string[] {
     counts.set(key, c);
   }
   return [...counts.values()].sort((a, b) => b.n - a.n || b.last.localeCompare(a.last)).map((c) => c.name);
+}
+
+export interface SeriesGroup {
+  /** As it's written most often ("Dune book series"). */
+  name: string;
+  items: Item[];
+}
+
+/**
+ * Everything that belongs to a series, grouped by series: "dune" and "Dune " count as the same one.
+ * A–Z by name; inside a series, in the order it was recommended (oldest first).
+ */
+export function seriesGroups(items: Item[]): SeriesGroup[] {
+  const groups = new Map<string, { spellings: Map<string, number>; items: Item[] }>();
+  for (const i of items) {
+    const name = i.series.trim();
+    if (!name) continue;
+    const key = normalize(name) || name.toLowerCase();
+    const g = groups.get(key) ?? { spellings: new Map<string, number>(), items: [] as Item[] };
+    g.spellings.set(name, (g.spellings.get(name) ?? 0) + 1);
+    g.items.push(i);
+    groups.set(key, g);
+  }
+  return [...groups.values()]
+    .map((g) => ({
+      name: [...g.spellings].sort((a, b) => b[1] - a[1])[0][0],
+      items: g.items.sort((a, b) => (a.recommendedOn ?? a.createdAt).localeCompare(b.recommendedOn ?? b.createdAt) || a.createdAt.localeCompare(b.createdAt)),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+/** Series names to suggest while typing one: the ones containing what's typed, not what's already there. */
+export function seriesSuggestions(items: Item[], typed: string, max = 6): string[] {
+  const t = normalize(typed);
+  if (!t) return [];
+  return seriesGroups(items)
+    .filter((g) => normalize(g.name) !== t && normalize(g.name).includes(t))
+    .sort((a, b) => b.items.length - a.items.length)
+    .slice(0, max)
+    .map((g) => g.name);
 }

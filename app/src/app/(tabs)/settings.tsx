@@ -44,9 +44,10 @@ export default function SettingsScreen() {
     requestSync();
     setImportMsg(
       `Added ${r.added} recommendation${r.added === 1 ? '' : 's'}` +
+      (r.updated ? ` · filled in empty fields on ${r.updated} already on your list` : '') +
       (r.skipped ? ` · ${r.skipped} already on your list (kept as is)` : '') +
       (r.categoriesAdded.length ? ` · new categories: ${r.categoriesAdded.join(', ')}` : '') +
-      (r.added + r.skipped === 0 ? '. No rows with a Title (or Name) column were found.' : '.'),
+      (r.added + r.updated + r.skipped === 0 ? '. No rows with a Title (or Name) column were found.' : '.'),
     );
   });
 
@@ -82,8 +83,8 @@ export default function SettingsScreen() {
         </View>
         <Muted>
           Import an .xlsx or .csv: an export from this app, or your own list. Columns are found by name (Title or
-          Name, Status, Rating, Recommended by, Why or Notes…), each tab becomes a category, and things already on
-          your list are skipped.
+          Name, Status, Rating, Recommended by, Why or Notes…) and each tab becomes a category. For things already on
+          your list, it only fills in what’s empty (like a series) and never changes what you’ve filled in.
         </Muted>
         <Button title="Import .xlsx or .csv" onPress={importFile} busy={busy === 'import'} small color={colors.chip} textColor={colors.text} />
         {importMsg && <Text style={{ color: colors.success }}>{importMsg}</Text>}
