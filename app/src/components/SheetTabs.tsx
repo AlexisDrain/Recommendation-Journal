@@ -47,7 +47,7 @@ export function SheetTabs({ tabs, selected, onSelect }: {
                 backgroundColor: on ? colors.card : pressed || hovered ? colors.chip : 'transparent',
               })}>
               <Text style={{ color: on ? colors.text : colors.muted, fontSize: 14, fontWeight: on ? '700' : '400' }} numberOfLines={1}>
-                {t.icon && <Text style={{ color: colors.warm }}>{t.icon} </Text>}
+                {t.icon && <Text style={{ color: colors.priority, fontWeight: '900' }}>{t.icon} </Text>}
                 {t.label}
               </Text>
               <Text style={{ color: colors.muted, fontSize: 12 }}>{t.count}</Text>
@@ -76,7 +76,7 @@ export function SheetTabPicker({ tabs, selected, onSelect }: {
         }}>
         <Text style={{ color: colors.muted, fontSize: 15 }}>Category</Text>
         <Text style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
-          {current?.icon && <Text style={{ color: colors.warm }}>{current.icon} </Text>}
+          {current?.icon && <Text style={{ color: colors.priority, fontWeight: '900' }}>{current.icon} </Text>}
           {current?.label}
         </Text>
         <Text style={{ color: colors.muted, fontSize: 13 }}>{current?.count ?? 0}</Text>
@@ -85,7 +85,7 @@ export function SheetTabPicker({ tabs, selected, onSelect }: {
       {open && (
         <View accessibilityRole="tablist" style={{ gap: 2, backgroundColor: colors.card, borderRadius: radius, borderWidth: 1, borderColor: colors.cardBorder, padding: space.xs }}>
           {tabs.map((t) => (
-            <Tab key={t.key} label={t.label} icon={t.icon} iconColor={colors.warm} count={t.count} selected={t.key === selected}
+            <Tab key={t.key} label={t.label} icon={t.icon} iconColor={colors.priority} count={t.count} selected={t.key === selected}
               onPress={() => { setOpen(false); onSelect(t.key); }} />
           ))}
         </View>

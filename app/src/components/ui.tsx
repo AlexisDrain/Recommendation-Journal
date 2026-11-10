@@ -71,16 +71,20 @@ export function Button({
   );
 }
 
-export function Chip({ label, selected, onPress, color = colors.accent }: {
+export function Chip({ label, selected, onPress, color = colors.accent, grow }: {
   label: string;
   selected?: boolean;
   onPress?: () => void;
   color?: string;
+  /** Share the row's width with the other growing chips (like two halves of a switch). */
+  grow?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, selected && { backgroundColor: color, borderColor: color }]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!selected }}
+      style={[styles.chip, grow && { flexGrow: 1, flexBasis: 0, alignItems: 'center' }, selected && { backgroundColor: color, borderColor: color }]}
     >
       <Text style={[styles.chipText, selected && { color: colors.bg, fontWeight: '600' }]}>{label}</Text>
     </Pressable>

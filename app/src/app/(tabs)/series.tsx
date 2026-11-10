@@ -9,6 +9,7 @@ import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { ItemEditor } from '@/components/ItemEditor';
 import { ItemRow } from '@/components/ItemRow';
 import { Toast, type ToastMessage } from '@/components/Toast';
+import { usePullToSync } from '@/components/usePullToSync';
 import { Muted, styles } from '@/components/ui';
 import { store, useData } from '@/db/store';
 import { normalize } from '@/lib/categories';
@@ -57,6 +58,7 @@ export default function SeriesScreen() {
   }), [groups, isOpen]);
   const toggle = useCallback((g: SeriesGroup, open: boolean) => setToggled((m) => new Map(m).set(g.name, !open)), []);
 
+  const pullControl = usePullToSync(); // pull down to sync (phones, with a sheet connected)
   const onPress = useCallback((item: Item) => setEditing(item), []);
   const hideToast = useCallback(() => setToast(null), []);
 
@@ -83,6 +85,7 @@ export default function SeriesScreen() {
       <FlatList
         style={{ flex: 1 }}
         data={rows}
+        refreshControl={pullControl}
         extraData={drafts}
         keyExtractor={(r) => r.key}
         keyboardShouldPersistTaps="handled"

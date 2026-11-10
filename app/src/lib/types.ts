@@ -3,8 +3,8 @@
 /** want = on your list ("Want to watch"); done = you've had it ("Watched"). */
 export type Status = 'want' | 'done';
 
-/** 1 ❌ bad · 2 ✅ average · 3 👍 great · 4 ❤️ exceptional (see rating.ts) */
-export type Rating = 1 | 2 | 3 | 4;
+/** 1 to 5 stars (see rating.ts). */
+export type Rating = 1 | 2 | 3 | 4 | 5;
 
 /**
  * A kind of thing people recommend: "Movies", "Fiction books", "Flash games"…

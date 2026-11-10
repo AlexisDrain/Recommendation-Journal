@@ -80,7 +80,7 @@ test('a field each, changed on two devices', async () => {
   await syncNow();
   assert.equal(cell('Heat', 'Why'), 'from there', "the sheet keeps the other device's note");
   assert.equal(cell('Heat', 'Recommended by'), 'Sam');
-  assert.equal(cell('Heat', 'Rating'), '👍 Great');
+  assert.equal(cell('Heat', 'Rating'), '★★★☆☆ Average 🙂');
   const merged = await here(uid);
   assert.equal(merged.note, 'from there', 'and this device gets it');
   assert.equal(merged.rating, 3);

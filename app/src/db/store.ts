@@ -42,7 +42,7 @@ const SELECT_CATEGORY = `
   FROM categories`;
 
 const SELECT_ITEM = `
-  SELECT id, uid, category_uid AS categoryUid, title, author, series, status, rating, recommended_by AS recommendedBy, note,
+  SELECT id, uid, category_uid AS categoryUid, title, author, series, status, stars AS rating, recommended_by AS recommendedBy, note,
          recommended_on AS recommendedOn, done_on AS doneOn, done_at AS doneAt, queue_pos AS queuePos, manual_pos AS manualPos, deleted, created_at AS createdAt, updated_at AS updatedAt
   FROM items`;
 
@@ -186,7 +186,7 @@ const ITEM_COLUMNS = {
   author: 'author',
   series: 'series',
   status: 'status',
-  rating: 'rating',
+  rating: 'stars', // 1-5 (migration 13); the old `rating` column is unused
   recommendedBy: 'recommended_by',
   note: 'note',
   recommendedOn: 'recommended_on',
@@ -357,10 +357,10 @@ const upNext = {
 /** Writes an item exactly as given (from the sheet or an import), keeping its `updatedAt`. */
 export async function writeItem(tx: SQLite.SQLiteDatabase, it: Omit<Item, 'id' | 'createdAt' | 'manualPos'> & { createdAt?: string; manualPos?: number | null }) {
   await tx.runAsync(
-    `INSERT INTO items (uid, category_uid, title, author, series, status, rating, recommended_by, note, recommended_on, done_on, queue_pos, deleted, updated_at, created_at, manual_pos)
+    `INSERT INTO items (uid, category_uid, title, author, series, status, stars, recommended_by, note, recommended_on, done_on, queue_pos, deleted, updated_at, created_at, manual_pos)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, coalesce(?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')), coalesce(?, (SELECT coalesce(max(manual_pos), 0) + 1 FROM items)))
      ON CONFLICT (uid) DO UPDATE SET
-       category_uid = excluded.category_uid, title = excluded.title, author = excluded.author, series = excluded.series, status = excluded.status, rating = excluded.rating,
+       category_uid = excluded.category_uid, title = excluded.title, author = excluded.author, series = excluded.series, status = excluded.status, stars = excluded.stars,
        recommended_by = excluded.recommended_by, note = excluded.note, recommended_on = excluded.recommended_on,
        done_on = excluded.done_on, queue_pos = excluded.queue_pos, deleted = excluded.deleted, updated_at = excluded.updated_at,
        manual_pos = coalesce(?, items.manual_pos)`,
@@ -378,9 +378,12 @@ export async function unsyncedFields(): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.uid, r.unsynced]));
 }
 
-/** The item reached the sheet as it was then. (Not if it was changed again meanwhile.) */
-export async function markSynced(uid: string, updatedAt: string, unsynced: string) {
-  await (await getDb()).runAsync(`UPDATE items SET unsynced = '' WHERE uid = ? AND updated_at = ? AND unsynced = ?`, uid, updatedAt, unsynced);
+/**
+ * The item reached the sheet as it was then. (Not if it was changed again meanwhile.) `left`: the
+ * fields the sheet couldn't take (its script is too old for them), which stay waiting.
+ */
+export async function markSynced(uid: string, updatedAt: string, unsynced: string, left = '') {
+  await (await getDb()).runAsync(`UPDATE items SET unsynced = ? WHERE uid = ? AND updated_at = ? AND unsynced = ?`, left, uid, updatedAt, unsynced);
 }
 
 // ---------- categories ----------

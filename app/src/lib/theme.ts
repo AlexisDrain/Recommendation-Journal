@@ -11,7 +11,8 @@ const DARK = {
   text: '#e8eaf6',
   muted: '#8a90b2',
   accent: '#9fa8ff', // buttons, selected chips, links
-  warm: '#ffc47a', // "want to" items and notes
+  warm: '#ffc47a', // "want to" items, notes and rating stars
+  priority: '#ffd84d', // the yellow ! of a priority
   danger: '#ff7b86',
   success: '#7be0a8', // "done" items
   successBg: '#15241f',
@@ -27,6 +28,7 @@ const LIGHT: typeof DARK = {
   muted: '#5f6688',
   accent: '#4c57c9', // darker accents, so they read on white (and white text reads on them)
   warm: '#b26a00',
+  priority: '#9a7400', // a deeper yellow, readable on white
   danger: '#c8323f',
   success: '#1c8a55',
   successBg: '#e3f4ea',

@@ -108,7 +108,7 @@ same two things on each.
 
 - **One tab per category**, in the app's order. Columns: *Title, Author, Status, Priority, Rating, Recommended by,
   Why, Recommended on, Experienced on*, then *Id* and *Updated* (grey, for the app's bookkeeping).
-- **Status and Rating** have drop-down lists (`Want to watch` / `Watched`, `❌ Bad` … `❤️ Exceptional`),
+- **Status and Rating** have drop-down lists (`Want to watch` / `Watched`, `★☆☆☆☆ Bad 👎` … `★★★★★ Amazing 💖`; ratings from older versions, like `👍 Great`, are rewritten that way),
   but typing works too: "watched", "yes" or "✓" count as done.
 - **Dates** are written `2026-10-21`. A lone year (`2019`) or month (`2019-03`) is fine too.
 - A **Categories** tab lists your categories and their words. A hidden **Deleted** tab notes what

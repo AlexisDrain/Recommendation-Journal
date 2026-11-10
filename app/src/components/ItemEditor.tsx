@@ -8,7 +8,7 @@ import { MAX_TEXT } from '@/db/rowFormat';
 import { withArticle } from '@/lib/categories';
 import { today } from '@/lib/dates';
 import { dropDraft, getDraft, keepDraft } from '@/lib/drafts';
-import { RATINGS } from '@/lib/rating';
+import { DEFAULT_RATING, ratingLabel, ratingWord, STARS } from '@/lib/rating';
 import { hasTitle, people, seriesSuggestions } from '@/lib/search';
 import { colors, radius, space } from '@/lib/theme';
 import type { Item, Rating, Status } from '@/lib/types';
@@ -66,6 +66,8 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
   const [base] = useState<ItemDraft>(() => item ? { ...item, upNext: item.queuePos != null } : {
     title: '', author: '', series: '', categoryUid: shown[0]?.uid ?? '', status: 'want', rating: null, recommendedBy: '', note: '',
     recommendedOn: today(), doneOn: null, ...start,
+    // Added as already done: it starts at 3 stars, like marking something done.
+    ...(start?.status === 'done' && !start.rating && { rating: DEFAULT_RATING }),
   });
   // A draft left here before (closed without saving). For a new one, only if it's the same title
   // you're adding now (or you didn't type one): adding something else starts fresh.
@@ -188,15 +190,18 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       <Input placeholder="Title" value={draft.title} onChangeText={(title) => set({ title })} maxLength={MAX_TEXT}
         autoFocus={!item && !draft.title} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Title" />
       {duplicate && <Text style={{ color: colors.warm }}>Already on your list in this category.</Text>}
-      <Input placeholder="Series, like Dune book series" value={draft.series}
-        onChangeText={(series) => set({ series })} maxLength={MAX_TEXT} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Series" />
-      {seriesIdeas.length > 0 && (
-        <View style={styles.chips}>
-          {seriesIdeas.map((name) => <Chip key={name} label={name} onPress={() => set({ series: name })} />)}
-        </View>
-      )}
-      <Input placeholder="Author (or director, artist…), like Stephen King" value={draft.author}
-        onChangeText={(author) => set({ author })} maxLength={MAX_TEXT} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author" />
+      {/* Indented under the title: details of it, which can be left empty. */}
+      <View style={{ marginLeft: space.md, paddingLeft: space.md, borderLeftWidth: 2, borderLeftColor: colors.cardBorder, gap: space.sm }}>
+        <Input placeholder="Series (optional), like Dune" value={draft.series}
+          onChangeText={(series) => set({ series })} maxLength={MAX_TEXT} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Series (optional)" />
+        {seriesIdeas.length > 0 && (
+          <View style={styles.chips}>
+            {seriesIdeas.map((name) => <Chip key={name} label={name} onPress={() => set({ series: name })} />)}
+          </View>
+        )}
+        <Input placeholder="Author (optional), or director, artist…" value={draft.author}
+          onChangeText={(author) => set({ author })} maxLength={MAX_TEXT} onFocus={reveal} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Author (optional)" />
+      </View>
 
       <Section n={n()} title="Category" />
       <View style={styles.chips}>
@@ -235,27 +240,39 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
 
       {/* Where it stands: on your list or done, how it was, and whether it's a priority. */}
       <Section n={n()} title="Status" />
-      <View style={styles.chips}>
-        <Chip label={category?.wantLabel || 'Want to'} selected={draft.status === 'want'} color={colors.warm}
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <Chip grow label={category?.wantLabel || 'Want to'} selected={draft.status === 'want'} color={colors.warm}
           onPress={() => set({ status: 'want', rating: null })} />
-        <Chip label={category?.doneLabel || 'Done'} selected={draft.status === 'done'} color={colors.success}
-          onPress={() => set({ status: 'done', doneOn: draft.doneOn ?? today() })} />
+        <Chip grow label={category?.doneLabel || 'Done'} selected={draft.status === 'done'} color={colors.success}
+          onPress={() => set({ status: 'done', doneOn: draft.doneOn ?? today(), rating: draft.rating ?? DEFAULT_RATING })} />
       </View>
       <Label>Your rating</Label>
-      <View style={styles.chips}>
-        {RATINGS.map((r) => (
-          <Chip key={r.value} label={`${r.emoji} ${r.label}`} selected={draft.rating === r.value}
-            onPress={() => draft.rating === r.value ? set({ rating: null })
-              : set({ rating: r.value, status: 'done', doneOn: draft.doneOn ?? today() })} />
-        ))}
+      {/* 1 to 5 stars. Tapping one also marks it done (you've had it); done starts at 3. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }} accessibilityRole="radiogroup" accessibilityLabel="Your rating">
+        {STARS.map((r) => {
+          const lit = !!draft.rating && r <= draft.rating;
+          return (
+            <Pressable key={r} hitSlop={4} accessibilityRole="radio" accessibilityLabel={ratingLabel(r)} accessibilityState={{ checked: draft.rating === r }}
+              onPress={() => set({ rating: r, status: 'done', doneOn: draft.doneOn ?? today() })}
+              style={({ pressed }) => ({ paddingHorizontal: 2, opacity: pressed ? 0.6 : 1 })}>
+              <Text style={{ fontSize: 34, color: lit ? colors.warm : colors.muted, opacity: lit ? 1 : 0.35 }}>★</Text>
+            </Pressable>
+          );
+        })}
+        {/* What the stars mean, to their right: "Great 👍". */}
+        {draft.rating && (
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600', marginLeft: space.sm, flexShrink: 1 }} numberOfLines={1}>
+            {ratingWord(draft.rating)}
+          </Text>
+        )}
       </View>
       {/* Priority: a pin on the thing itself, apart from its status. Done things aren't on it. */}
       {draft.status === 'want' && (
         <>
           <Label>Want to get to it soon?</Label>
           <View style={styles.chips}>
-            <Chip label={draft.upNext ? `★ Priority${item?.queuePos ? ` #${item.queuePos}` : ''}` : '☆ Make it a priority'} selected={!!draft.upNext}
-              color={colors.warm} onPress={() => set({ upNext: !draft.upNext })} />
+            <Chip label={draft.upNext ? `! Priority${item?.queuePos ? ` #${item.queuePos}` : ''}` : '! Make it a priority'} selected={!!draft.upNext}
+              color={colors.priority} onPress={() => set({ upNext: !draft.upNext })} />
           </View>
         </>
       )}

@@ -187,6 +187,18 @@ export const MIGRATIONS: string[] = [
   `
   CREATE INDEX items_manual_pos_idx ON items (manual_pos);
   `,
+
+  // 13 — ratings become 1 to 5 stars. The rating column only allows 1 to 4 (and SQLite can't
+  // change that), so the stars get a column of their own: ❌ 1 → 1, ✅ 2 → 3, 👍 3 → 4, ❤️ 4 → 5.
+  // Not marked as changed: every device converts the same way, and the sheet's old words read back
+  // as the same stars. The old column is left as it is, unused.
+  `
+  ALTER TABLE items ADD COLUMN stars INTEGER CHECK (stars IS NULL OR stars BETWEEN 1 AND 5);
+  DROP TRIGGER items_unsynced;
+  DROP TRIGGER items_unsynced_new;
+  UPDATE items SET stars = CASE rating WHEN 1 THEN 1 WHEN 2 THEN 3 WHEN 3 THEN 4 WHEN 4 THEN 5 END WHERE rating IS NOT NULL;
+  ${unsyncedTriggers([...UNSYNCED_FIELDS.map(([f, c]): [string, string] => (f === 'rating' ? ['rating', 'stars'] : [f, c])), ['series', 'series']])}
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase) {

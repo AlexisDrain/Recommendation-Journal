@@ -32,7 +32,7 @@
  * Bump this whenever the script changes in a way the app should know about. The app compares it
  * with the version it was built for and tells the user when their sheet's script is out of date.
  */
-const SCRIPT_VERSION = 8;
+const SCRIPT_VERSION = 11;
 
 /**
  * Which app this sheet is for. Sleep Journal's template looks much the same (a web app URL and a
@@ -51,7 +51,13 @@ const ORDER = 'List order';
 const CAT_COLS = ['Id', 'Name', 'One is called', 'On your list', 'Done', 'Order', 'Hidden', 'Deleted', UPDATED];
 const ITEM_COLS = ['Title', 'Series', 'Author', 'Status', 'Priority', 'Rating', 'Recommended by', 'Why', 'Recommended on', 'Experienced on', 'Id', UPDATED, CHANGED, ORDER];
 const ITEM_WIDTHS = [260, 160, 180, 130, 70, 130, 160, 320, 120, 120, 130, 160, 160, 90];
-const RATINGS = ['❌ Bad', '✅ Average', '👍 Great', '❤️ Exceptional'];
+const RATINGS = ['★☆☆☆☆ Bad 👎', '★★☆☆☆ Meh 😕', '★★★☆☆ Average 🙂', '★★★★☆ Great 👍', '★★★★★ Amazing 💖'];
+/** Ratings as older versions wrote them → as they are now: the four steps before 9, 9's bare stars, 10's "Okay". */
+const OLD_RATINGS = {
+  '❌ Bad': RATINGS[0], '✅ Average': RATINGS[2], '👍 Great': RATINGS[3], '❤️ Exceptional': RATINGS[4],
+  '★☆☆☆☆': RATINGS[0], '★★☆☆☆': RATINGS[1], '★★★☆☆': RATINGS[2], '★★★★☆': RATINGS[3], '★★★★★': RATINGS[4],
+  '★★★☆☆ Okay 🙂': RATINGS[2],
+};
 const HEADER_COLOR = '#c9cdf5';
 const SYSTEM_COLOR = '#e4e6f2'; // Id / Updated: the app's bookkeeping
 
@@ -325,7 +331,7 @@ function ensureTabs_(ctx, cats) {
     setProp_(ctx, 'TAB_' + c.id, t.id);
     setProp_(ctx, 'TABNAME_' + c.id, t.name);
     // Columns, drop-downs and hiding: only when the category's words or "hidden" changed.
-    const layout = JSON.stringify([6, c.want, c.done, c.hidden]);
+    const layout = JSON.stringify([11, c.want, c.done, c.hidden]);
     if (prop_(ctx, 'LAYOUT_' + t.id) !== layout) {
       ensureItemColumns_(t.sh);
       applyChoices_(t.sh, c);
@@ -424,6 +430,15 @@ function applyChoices_(sh, c) {
       SpreadsheetApp.newDataValidation().requireValueInList([want, done], true).setAllowInvalid(true).build());
   }
   if (rating) {
+    // Ratings written by an older version ("👍 Great", "★★★★☆") become "★★★★☆ Great 👍", once.
+    const last = sh.getLastRow();
+    if (last > 1) {
+      const cells = sh.getRange(2, rating, last - 1, 1);
+      const values = cells.getValues();
+      if (values.some(function (r) { return OLD_RATINGS[String(r[0]).trim()]; })) {
+        cells.setValues(values.map(function (r) { return [OLD_RATINGS[String(r[0]).trim()] || r[0]]; }));
+      }
+    }
     sh.getRange(2, rating, rows, 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(RATINGS, true).setAllowInvalid(true).build());
   }

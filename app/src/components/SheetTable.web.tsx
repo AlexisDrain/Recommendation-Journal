@@ -14,7 +14,8 @@ export interface SheetRow { uid: string; cells: Partial<Record<SheetColumn, stri
 // The app's own text font (React Native Web's), which plain HTML doesn't pick up by itself.
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
-export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: SheetRow[] }) {
+/** `refreshControl` (pull to sync) is for phones only: a browser has no pull-down. */
+export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: SheetRow[]; refreshControl?: unknown }) {
   useThemeName(); // redraw when the display changes (dark / light)
   const box = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState({ left: false, right: false });

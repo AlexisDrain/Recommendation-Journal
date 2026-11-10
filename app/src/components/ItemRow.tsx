@@ -2,7 +2,7 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { formatDate } from '@/lib/dates';
-import { RATINGS, ratingEmoji } from '@/lib/rating';
+import { ratingLabel } from '@/lib/rating';
 import { colors, radius, space } from '@/lib/theme';
 import type { Category, Item } from '@/lib/types';
 
@@ -37,7 +37,7 @@ export const ItemRow = memo(function ItemRow({ item, category, showCategory, sho
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ color: colors.text, fontSize: 17, fontWeight: '600' }}>
-            {item.queuePos != null && <Text style={{ color: colors.warm }}>★ {item.queuePos}  </Text>}
+            {item.queuePos != null && <Text style={{ color: colors.priority, fontWeight: '900' }}>! #{item.queuePos}  </Text>}
             {item.title}
           </Text>
           <Text style={{ color: colors.muted, fontSize: 13 }}>{meta}</Text>
@@ -48,7 +48,12 @@ export const ItemRow = memo(function ItemRow({ item, category, showCategory, sho
             </Text>
           )}
         </View>
-        {item.rating ? <Text style={{ fontSize: 22 }} accessibilityLabel={RATINGS[item.rating - 1].label}>{ratingEmoji(item.rating)}</Text> : null}
+        {item.rating ? (
+          <Text style={{ fontSize: 15, letterSpacing: 1 }} accessibilityLabel={ratingLabel(item.rating)}>
+            <Text style={{ color: colors.warm }}>{'★'.repeat(item.rating)}</Text>
+            <Text style={{ color: colors.muted, opacity: 0.4 }}>{'★'.repeat(5 - item.rating)}</Text>
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );

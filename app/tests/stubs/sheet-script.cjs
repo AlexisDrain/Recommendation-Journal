@@ -73,7 +73,13 @@ class Sheet {
   getDataRange() { return new Range(this, 1, 1, Math.max(1, this.getLastRow()), Math.max(1, this.getLastColumn())); }
 }
 
-function makeEnv() {
+/**
+ * The script running on a spreadsheet. `source`: another version of the script's text (to test an
+ * older one). `on`: an env whose spreadsheet and settings to use, as when you paste a new version
+ * of the script into the same sheet.
+ */
+function makeEnv({ source, on } = {}) {
+  if (on) return run(on.ss, on.props, source);
   const ss = {
     sheets: [],
     active: null,
@@ -89,7 +95,10 @@ function makeEnv() {
     moveActiveSheet: (pos) => { const s = ss.getActiveSheet(); ss.sheets.splice(ss.sheets.indexOf(s), 1); ss.sheets.splice(pos - 1, 0, s); },
   };
   ss.sheets.push(new Sheet(ss, 'Sheet1'));
-  const props = new Map();
+  return run(ss, new Map(), source);
+}
+
+function run(ss, props, source) {
   const validation = { requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } };
   const ctx = {
     console,
@@ -109,8 +118,21 @@ function makeEnv() {
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }) },
   };
   vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../../../google-sheets/RecommendationJournalSync.gs'), 'utf8'), ctx);
+  vm.runInContext(source ?? scriptSource(), ctx);
   return { ctx, ss, props };
 }
 
-module.exports = { makeEnv };
+/** The script's text, as in google-sheets/. */
+const scriptSource = () => fs.readFileSync(path.join(__dirname, '../../../google-sheets/RecommendationJournalSync.gs'), 'utf8');
+
+/** Version 6 of the script, before the Series column: today's, without it. */
+function version6() {
+  const s = scriptSource()
+    .replace(/const SCRIPT_VERSION = \d+;/, 'const SCRIPT_VERSION = 6;')
+    .replace("const ITEM_COLS = ['Title', 'Series', ", "const ITEM_COLS = ['Title', ")
+    .replace('const ITEM_WIDTHS = [260, 160, ', 'const ITEM_WIDTHS = [260, ');
+  if (s.includes("'Series'") && s.includes("ITEM_COLS = ['Title', 'Series'")) throw new Error('could not make version 6');
+  return s;
+}
+
+module.exports = { makeEnv, version6 };

@@ -57,7 +57,7 @@ YOUR OWN CATEGORIES
 Movies, books, TV shows, video games, albums, recipes, or anything you like. Each category uses its own words: "Want to watch" and "Watched" for movies, "Want to read" and "Read" for books.
 
 RANK WHAT'S NEXT
-Put your must-try picks in Priority and drag them into order. Rate what you've tried in one tap: ❌ ✅ 👍 or ❤️.
+Put your must-try picks in Priority and drag them into order. Rate what you've tried in one tap, from 1 to 5 stars.
 
 YOUR LIST AS A SPREADSHEET
 See everything as a table, and export it as an .xlsx or .csv whenever you like. Import a list you already keep in a spreadsheet.

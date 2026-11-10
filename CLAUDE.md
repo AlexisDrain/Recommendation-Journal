@@ -6,7 +6,7 @@ except for the pieces listed under "Bring over from Sleep Journal".
 
 **What it is (decided 2026-10-21):** a list of things people recommended to you: title,
 category (each its own Google Sheet tab, with its own words like "Want to watch" / "Watched"),
-who recommended it, why, status, rating (❌ ✅ 👍 ❤️), date recommended and date experienced.
+who recommended it, why, status, rating (1 to 5 stars; ❌ ✅ 👍 ❤️ before build 81), date recommended and date experienced.
 The goal is as few taps as possible: one box on the list screen both searches and adds. Screens:
 List and Settings. See README.md and DEVELOPING.md. `DontCommit-StudyOnly.xlsx` is Alexis's old
 hand-made list, for study only: never commit it.

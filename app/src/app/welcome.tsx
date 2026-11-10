@@ -27,7 +27,7 @@ export default function WelcomeScreen() {
             <Text style={{ fontSize: 64, color: colors.warm }}>★</Text>
             <Text style={{ color: colors.text, fontSize: 30, fontWeight: '800', textAlign: 'center' }}>Recommendation Journal</Text>
             <Text style={{ color: colors.muted, fontSize: 17, textAlign: 'center', lineHeight: 24 }}>
-              Remember what people recommend to you{'\n'}(movies, video games, albums, and more),{'\n'}who told you, and why.
+              Save and remember what people recommend to you (movies, video games, albums, and more), who told you, and why.
             </Text>
           </View>
           <Button title="Get started" onPress={() => setStep(1)} />
@@ -40,7 +40,7 @@ export default function WelcomeScreen() {
           <Step icon="⌕" color={colors.accent} title="Already on your list?"
             body="The same box searches as you type: titles, authors, who recommended it and your notes." />
           <Step icon="✓" color={colors.success} title="When you've watched, read or played it"
-            body="Open it, mark it done and rate it: ❌ bad, ✅ average, 👍 great, ❤️ exceptional." />
+            body="Open it, mark it done and rate it from 1 to 5 stars." />
           <Step icon="⌂" color={colors.success} title="Private by design"
             body="Your list is stored only on this device. No account, no server, no tracking." />
           <Muted>Categories (Movies, Fiction books, Video games…) can be renamed, reordered or hidden in the Categories tab.</Muted>

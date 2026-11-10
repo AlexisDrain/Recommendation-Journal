@@ -22,7 +22,7 @@ const PUSH_BATCH = 300;
 /** A phone can suspend the app mid-request: without a limit, that sync would block all later ones. */
 const REQUEST_TIMEOUT_MS = 90_000;
 /** The version of google-sheets/RecommendationJournalSync.gs this app was built for (its SCRIPT_VERSION). */
-export const LATEST_SCRIPT_VERSION = 8;
+export const LATEST_SCRIPT_VERSION = 11;
 
 export interface Connection { url: string; secret: string }
 
@@ -35,7 +35,18 @@ export interface SyncState {
   lastSyncAt: string | null;
   lastError: string | null;
   scriptVersion: number;
+  /**
+   * Every series was sent again after the sheet first had a script with a Series column (7 or
+   * later). An earlier app counted a series as sent even when an older script had dropped it.
+   */
+  seriesResent?: boolean;
 }
+
+/**
+ * Fields an older script has no column for: the script version that first takes each. Sent to an
+ * older script, a change to one stays waiting (it isn't counted as sent) until the script is updated.
+ */
+const FIELD_SINCE: Record<string, number> = { series: 7 };
 const EMPTY_STATE: SyncState = { sheetName: null, sheetUrl: null, lastPushed: '', lastPulled: '', lastSyncAt: null, lastError: null, scriptVersion: LATEST_SCRIPT_VERSION };
 
 /** "https://script.google.com/macros/s/…/exec#<secret>" → its parts, or null if it isn't one. */
@@ -307,6 +318,17 @@ async function runSync() {
       full: !lookedAtEverything,
     });
     const pulled = await applyAnswer(answer);
+    const version = answer.version ?? 1;
+    // The first sync with a script that has a Series column: send every series once more (with a
+    // new time, or the sheet would keep its own copy of the row as just as new).
+    if (version >= FIELD_SINCE.series && !state.seriesResent) {
+      await (await getDb()).runAsync(
+        `UPDATE items SET updated_at = max(?, strftime('%Y-%m-%dT%H:%M:%SZ', updated_at, '+1 second')), unsynced = trim(unsynced || CASE WHEN instr(' ' || unsynced || ' ', ' series ') = 0 THEN ' series' ELSE '' END)
+         WHERE series <> '' AND deleted = 0`, stamp());
+      state.seriesResent = true;
+    }
+    /** Of the fields sent, those this script has no column for: they wait for a newer script. */
+    const waiting = (fields: string) => fields.split(' ').filter((f) => (FIELD_SINCE[f] ?? 0) > version).join(' ');
 
     // 2. Send what changed here (now including what was just merged in): newer than the last
     // send, or with fields the sheet doesn't have yet. Big first syncs go in batches.
@@ -328,12 +350,14 @@ async function runSync() {
       // even if time and list look the same (times are kept to the second).
       const now = new Map((await allItems()).map((it) => [it.uid, JSON.stringify(it)]));
       for (const it of batch) {
-        if (sentWith.has(it.uid) && now.get(it.uid) === JSON.stringify(it)) await markSynced(it.uid, it.updatedAt, sentWith.get(it.uid)!);
+        if (sentWith.has(it.uid) && now.get(it.uid) === JSON.stringify(it)) {
+          await markSynced(it.uid, it.updatedAt, sentWith.get(it.uid)!, waiting(sentWith.get(it.uid)!));
+        }
       }
     }
     if (changed.length) state.lastPushed = changed.reduce((max, i) => (i.updatedAt > max ? i.updatedAt : max), state.lastPushed);
     if (answer.now) state.lastPulled = answer.now;
-    state.scriptVersion = answer.version ?? 1;
+    state.scriptVersion = version;
     if (answer.sheet) state.sheetName = answer.sheet; // the sheet may have been renamed
     state.sheetUrl = sheetAddress(answer.url) ?? state.sheetUrl;
     await saveState({ ...state, lastSyncAt: new Date().toISOString(), lastError: null });

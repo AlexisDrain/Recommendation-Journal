@@ -6,7 +6,7 @@
 // The rows scroll up and down inside the sideways scroller; with touch, each swipe goes to the
 // right one.
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, Text, View, type ScrollViewInstance } from 'react-native';
+import { FlatList, Pressable, ScrollView, Text, View, type RefreshControlProps, type ScrollViewInstance } from 'react-native';
 import { useThemeName } from '@/lib/displayMode';
 import { colors } from '@/lib/theme';
 import { columnWidths, HEADER_HEIGHT, jumpTarget, ROW_HEIGHT, scrollStops, type SheetColumn } from './sheetLayout';
@@ -14,7 +14,12 @@ import { columnWidths, HEADER_HEIGHT, jumpTarget, ROW_HEIGHT, scrollStops, type 
 export type { SheetColumn } from './sheetLayout';
 export interface SheetRow { uid: string; cells: Partial<Record<SheetColumn, string>> }
 
-export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: SheetRow[] }) {
+export function SheetTable({ columns, rows, refreshControl }: {
+  columns: SheetColumn[];
+  rows: SheetRow[];
+  /** Pull the rows down to sync. */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
+}) {
   const theme = useThemeName(); // redraw when the display changes
   const scroller = useRef<ScrollViewInstance>(null);
   const offset = useRef(0);
@@ -63,6 +68,7 @@ export function SheetTable({ columns, rows }: { columns: SheetColumn[]; rows: Sh
           </View>
           <FlatList
             data={rows}
+            refreshControl={refreshControl}
             extraData={[theme, widths]}
             keyExtractor={(r) => r.uid}
             getItemLayout={(_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index })}

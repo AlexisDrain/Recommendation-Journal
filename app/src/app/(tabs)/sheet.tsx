@@ -7,10 +7,11 @@
 // Sheet" shows when a Google Sheet is connected.
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, ScrollView, Text, View } from 'react-native';
 import { SheetTable, type SheetColumn, type SheetRow } from '@/components/SheetTable';
 import { SheetTabPicker, SheetTabs, type SheetTab } from '@/components/SheetTabs';
 import { Button, ErrorBox, Muted, styles } from '@/components/ui';
+import { usePullToSync } from '@/components/usePullToSync';
 import { exportCsv, exportXlsx } from '@/db/exchange';
 import { COLUMNS, itemCells } from '@/db/rowFormat';
 import { store, useData } from '@/db/store';
@@ -33,6 +34,7 @@ export default function SheetScreen() {
   const [topTextWidth, setTopTextWidth] = useState(0);
   const stacked = topTextWidth > 0 && topTextWidth >= topWidth - 1; // the text has the line to itself
   const { running } = useSyncStatus();
+  const pullControl = usePullToSync(); // pull the rows down to sync (phones, with a sheet connected)
 
   // Connecting or disconnecting happens in Settings, and a sync can bring the address: look again
   // whenever this tab is shown and whenever a sync ends.
@@ -63,7 +65,7 @@ export default function SheetScreen() {
     for (const i of shown) counts.set(i.categoryUid, (counts.get(i.categoryUid) ?? 0) + 1);
     return [
       { key: 'all', label: 'All', count: shown.length },
-      { key: 'upnext', label: 'Priority', icon: '★', count: priorities.length },
+      { key: 'upnext', label: 'Priority', icon: '!', count: priorities.length },
       ...visible.map((c) => ({ key: c.uid, label: c.name, count: counts.get(c.uid) ?? 0 })),
     ];
   }, [shown, priorities, visible]);
@@ -105,13 +107,13 @@ export default function SheetScreen() {
       {/* Right on top of the table, like a spreadsheet's tabs. */}
       {wide && <SheetTabs tabs={sheetTabs} selected={selected} onSelect={setTab} />}
       {rows.length === 0 ? (
-        <View style={{ flex: 1, paddingHorizontal: space.lg }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: space.lg }} refreshControl={pullControl}>
           <Muted>{selected === 'upnext'
             ? 'No priorities yet. Mark things as a priority on the List tab, and they show up here in order.'
             : 'Nothing here yet. Things you add on the List tab show up here as rows.'}</Muted>
-        </View>
+        </ScrollView>
       ) : (
-        <SheetTable key={selected} columns={category ? [...COLUMNS] : ALL_COLUMNS} rows={rows} />
+        <SheetTable key={selected} columns={category ? [...COLUMNS] : ALL_COLUMNS} rows={rows} refreshControl={pullControl} />
       )}
     </View>
   );
