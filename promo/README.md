@@ -130,6 +130,22 @@ No account or sign-in is needed: everything is stored on the device. Syncing wit
 - **iPad:** not needed. The app is iPhone-only (`supportsTablet: false` in `app/app.json`), so App
   Store Connect shouldn't ask for iPad screenshots.
 
+### Outside the App Store: `wide-header/`
+
+The first header design: the app's name and one line on the left, three phones on the right
+(Fiction books, Movies, Priority). Too wide for the App Store's crop, but good where the whole
+picture shows. Made from the app as of build 84 (1–5 stars, the yellow ! for priorities).
+
+| Where | File | Size |
+|---|---|---|
+| GitHub: Settings → General → Social preview | `wide-header/github-social-1280x640.png` | 1280 × 640 (under GitHub's 1 MB limit) |
+| Product Hunt: gallery image (first one is the thumbnail in some places) | `wide-header/producthunt-1270x760.png` | 1270 × 760 |
+| A banner: README top, Product Hunt maker page, social posts | `wide-header/banner-3840x1646.png` | 3840 × 1646 |
+
+To make them again: steps 1–3 below (only `05-priority`, `06-movies` and `x-fiction` are needed),
+copy `app/assets/icon.png` to `source/out/icon.png`, serve `source/`, then open
+`art.html` at those sizes without `kind=` (`?wide=1` for the 3840 × 1646 banner).
+
 The pictures come from the web version of the app, drawn at exact iPhone sizes, with an iPhone
 status bar and home bar added. So the fonts are Windows' (Segoe UI) rather than the iPhone's, and
 the emoji are Windows' too. If you'd rather show the real iPhone look, take screenshots on an
