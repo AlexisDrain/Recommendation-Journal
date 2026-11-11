@@ -3,9 +3,10 @@
 // type → Enter → Save.
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, Pressable, ScrollView, Text, View } from 'react-native';
-import { categoryNamed, store, useData } from '@/db/store';
+import { categoryNamed, DELETED_DAYS, store, useData } from '@/db/store';
 import { MAX_TEXT } from '@/db/rowFormat';
 import { withArticle } from '@/lib/categories';
+import { confirmAction } from '@/lib/confirm';
 import { today } from '@/lib/dates';
 import { dropDraft, getDraft, keepDraft } from '@/lib/drafts';
 import { DEFAULT_RATING, ratingLabel, ratingWord, STARS } from '@/lib/rating';
@@ -164,7 +165,11 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
   };
 
   const remove = async () => {
-    if (!item) return; // no "are you sure?": the list offers Undo instead
+    if (!item) return;
+    // Asked first, even though the list offers Undo and Recently deleted keeps it a while.
+    const ok = await confirmAction(`Delete “${item.title}”?`,
+      `It goes to Recently deleted, where you can restore it for ${DELETED_DAYS} days.`, 'Delete');
+    if (!ok) return;
     await store.items.remove(item.uid);
     dropDraft(draftKey);
     onDeleted?.(item);
@@ -295,16 +300,10 @@ function ItemForm({ item, start, onClose, onSaved, onDeleted, registerClose }: P
       {changed && (
         <Button title="Discard changes" onPress={discard} small color={colors.chip} textColor={colors.warm} />
       )}
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <View style={{ flex: 1 }}>
-          <Button title={item ? 'Save' : 'Add'} onPress={save} busy={busy} disabled={!draft.title.trim()} />
-        </View>
-        {item && (
-          <View style={{ flex: 1 }}>
-            <Button title="Delete" onPress={remove} color={colors.danger} />
-          </View>
-        )}
-      </View>
+      {/* Save above Delete, not side by side, where a thumb could hit the wrong one. The card's own
+          gap spaces them evenly with Discard changes. */}
+      <Button title={item ? 'Save' : 'Add'} onPress={save} busy={busy} disabled={!draft.title.trim()} />
+      {item && <Button title="Delete" onPress={remove} color={colors.danger} />}
     </ScrollView>
   );
 }

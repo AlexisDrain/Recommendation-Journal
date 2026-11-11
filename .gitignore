@@ -16,3 +16,8 @@ credentials.json
 *.jks
 *.keystore
 *.mobileprovision
+
+# Promo work folders (frames for the videos, raw screenshots): made again by the scripts
+promo/source/frames/
+promo/source/raw/
+promo/source/out/

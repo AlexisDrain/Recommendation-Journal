@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { store, useData } from '@/db/store';
 import { confirmAction } from '@/lib/confirm';
-import { colors, space } from '@/lib/theme';
+import { colors } from '@/lib/theme';
 import type { Category } from '@/lib/types';
 import { CategoryFields, emptyCategoryDraft, type CategoryDraft } from './CategoryFields';
 import { formContent, formHeader, Panel, useCloseHandler, useCloseRequest, useOpening, useRevealFocused } from './Panel';
@@ -88,16 +88,9 @@ function CategoryForm({ category, onClose, onSaved, registerClose }: Props & {
       )}
       {category && <Muted>Hidden categories are left off the list and the add screen. Their recommendations are kept.</Muted>}
       {error && <Text style={{ color: colors.danger }}>{error}</Text>}
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <View style={{ flex: 1 }}>
-          <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
-        </View>
-        {category && (
-          <View style={{ flex: 1 }}>
-            <Button title="Delete" onPress={remove} color={colors.danger} />
-          </View>
-        )}
-      </View>
+      {/* Save above Delete, not side by side (like the recommendation card). */}
+      <Button title={category ? 'Save' : 'Add category'} onPress={save} busy={busy} disabled={!draft.name.trim()} />
+      {category && <Button title="Delete" onPress={remove} color={colors.danger} />}
     </ScrollView>
   );
 }

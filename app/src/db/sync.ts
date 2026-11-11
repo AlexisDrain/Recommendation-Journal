@@ -229,6 +229,18 @@ export function onPulled(fn: () => void): () => void {
   return () => pulledListeners.delete(fn);
 }
 
+/**
+ * What a sync did, for the notice at the top (SheetToast): recommendations new from the sheet,
+ * others changed by it, and how many of this device's went out to it.
+ */
+export interface SheetNews { added: number; updated: number; saved: number }
+const newsListeners = new Set<(n: SheetNews) => void>();
+/** Get told after each sync that sent or received something. */
+export function onSheetNews(fn: (n: SheetNews) => void): () => void {
+  newsListeners.add(fn);
+  return () => newsListeners.delete(fn);
+}
+
 // ---------- running it ----------
 
 /** Whether a sync is going on right now, and why the last one failed (null once one succeeds). */
@@ -317,7 +329,7 @@ async function runSync() {
       pull: true,
       full: !lookedAtEverything,
     });
-    const pulled = await applyAnswer(answer);
+    const { count: pulled, added } = await applyAnswer(answer);
     const version = answer.version ?? 1;
     // The first sync with a script that has a Series column: send every series once more (with a
     // new time, or the sheet would keep its own copy of the row as just as new).
@@ -369,6 +381,7 @@ async function runSync() {
     // Each item carries its own Priority number, so two devices' numbering can mix into two #1s
     // or a gap. Number them 1, 2, 3… again, and send that in another round.
     if (await store.upNext.tidy()) again = true;
+    if (pulled || changed.length) newsListeners.forEach((fn) => fn({ added, updated: Math.max(0, pulled - added), saved: changed.length }));
     return { pushed: changed.length, pulled };
   } catch (e) {
     await saveState({ ...state, lastError: (e as Error).message });
@@ -376,8 +389,8 @@ async function runSync() {
   }
 }
 
-/** Takes in what the sheet sent back. Returns how many things changed on this device. */
-async function applyAnswer(answer: SyncAnswer): Promise<number> {
+/** Takes in what the sheet sent back. Returns how many things changed on this device, and how many of them are new here. */
+async function applyAnswer(answer: SyncAnswer): Promise<{ count: number; added: number }> {
   const db = await getDb();
   // Read first: on phones the transaction is exclusive, so only `tx` may be used inside it.
   const local = new Map((await allCategories()).map((c) => [c.uid, c]));
@@ -385,6 +398,7 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
   const unsynced = await unsyncedFields();
   const keepOf = (uid: string) => new Set((unsynced.get(uid) ?? '').split(' ').filter(Boolean));
   let count = 0;
+  let added = 0;
   await transaction(db, async (tx) => {
     // A category this device made has the same name as one already in the sheet: become that one.
     for (const [mine, theirs] of Object.entries(answer.aliases ?? {})) {
@@ -440,6 +454,7 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
       if (merged.status === 'done' && mine?.status !== 'done') await tx.runAsync(`UPDATE items SET done_at = ? WHERE uid = ?`, r.updated, r.id);
       if (merged.status === 'want' && mine?.status === 'done') await tx.runAsync(`UPDATE items SET done_at = NULL WHERE uid = ?`, r.id);
       count++;
+      if (!mine) added++;
     }
     // Deleted on another device. A deletion beats edits made here to other fields that haven't been
     // sent (they're kept, for Recently deleted), but not a restore made here that hasn't been sent.
@@ -455,7 +470,7 @@ async function applyAnswer(answer: SyncAnswer): Promise<number> {
       count++;
     }
   });
-  return count;
+  return { count, added };
 }
 
 /** The fields of a recommendation that sync, as the sheet has them. */

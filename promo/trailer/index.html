@@ -16,7 +16,8 @@
   --text: #e8eaf6;
   --muted: #8a90b2;
   --accent: #9fa8ff;  /* buttons, selected */
-  --warm: #ffc47a;    /* on your list, Priority */
+  --warm: #ffc47a;    /* on your list, rating stars */
+  --prio: #ffd84d;    /* the yellow ! of a priority */
   --green: #7be0a8;   /* done */
   --sky: #070912;     /* around the stage */
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
@@ -83,6 +84,16 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
 .chipx.sel { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
 .chipx.w.sel { background: var(--warm); border-color: var(--warm); }
 .chipx.g.sel { background: var(--green); border-color: var(--green); }
+.chipx.p.sel { background: var(--prio); border-color: var(--prio); }
+/* Want to / Done: two halves of the row, as in the app */
+.chips.split { flex-wrap: nowrap; }
+.chips.split .chipx { flex: 1; text-align: center; }
+/* the rating in the edit card: five stars, and what they mean beside them */
+.rate { display: flex; align-items: center; gap: 2px; margin: 0 0 8px; }
+.rate i { font-style: normal; font-size: 22px; color: var(--muted); opacity: .35; transition: color .2s, opacity .2s; }
+.rate i.lit { color: var(--warm); opacity: 1; }
+.rate span { margin-left: 8px; font-size: 13px; font-weight: 600; }
+.lbl { font-size: 11px; color: var(--muted); margin: 0 0 4px; }
 .addbar { background: var(--accent); color: var(--bg); border-radius: 12px; padding: 10px 12px; font-weight: 700; font-size: 12.5px; margin-bottom: 10px; transition: opacity .3s; }
 .irow { position: relative; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--warm); border-radius: 12px; padding: 9px 10px 9px 12px; margin-bottom: 8px;
   overflow: hidden; max-height: 120px; transition: max-height .35s, padding .35s, margin .35s, opacity .3s, border-color .4s, box-shadow .4s; }
@@ -90,10 +101,14 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
 .irow.gone { max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; opacity: 0; border-width: 0; }
 .irow.flash { box-shadow: inset 0 0 0 999px #9fa8ff2a; }
 .irow .t { font-size: 14px; font-weight: 600; }
-.irow .t i { color: var(--warm); font-style: normal; }
+.irow .t i { color: var(--prio); font-style: normal; font-weight: 800; }
 .irow .m { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 .irow .n { font-size: 11.5px; font-style: italic; color: #cfd2ea; margin-top: 3px; }
 .irow .r { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; }
+.irow .stars { font-size: 13px; letter-spacing: 1px; }
+.irow:has(> .stars) .t, .irow:has(> .stars) .m { padding-right: 78px; } /* the text stays clear of the stars */
+.stars b { color: var(--warm); font-weight: 400; }
+.stars em { color: var(--muted); opacity: .4; font-style: normal; }
 .irow .grip { position: absolute; right: 0; top: 0; bottom: 0; width: 36px; display: grid; place-items: center; color: var(--muted); font-size: 19px; }
 .muted { color: var(--muted); font-size: 11px; line-height: 1.45; margin-bottom: 10px; }
 .queue { position: relative; height: 290px; }
@@ -196,7 +211,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
         <div class="center">
           <svg class="mark" aria-hidden="true"><use href="#logo"/></svg>
           <h1 class="title">Recommendation Journal</h1>
-          <p class="sub">Remember what people recommend to you, who told you, and why.</p>
+          <p class="sub">Save and remember what people recommend to you, who told you, and why.</p>
           <span class="pill">Free &amp; Open Source</span>
         </div>
       </section>
@@ -223,12 +238,12 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
                 <div class="n">My brother plays it on his lunch break</div>
               </div>
               <div id="a-list">
-                <div class="irow"><div class="t"><i>★ 1 </i> Citizen Kane</div><div class="m">by Orson Welles · Movies · Want to watch · from my film teacher</div></div>
-                <div class="irow done"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched · from Dad</div><span class="r">❤️</span></div>
+                <div class="irow"><div class="t"><i>! #1 </i> Citizen Kane</div><div class="m">by Orson Welles · Movies · Want to watch · from my film teacher</div></div>
+                <div class="irow done"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched · from Dad</div><span class="r stars"><b>★★★★★</b></span></div>
                 <div class="irow"><div class="t">The Count of Monte Cristo</div><div class="m">by Alexandre Dumas · Fiction books · Want to read</div></div>
               </div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>❐</b>Series</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="toast" id="a-toast">Added “Qoosh”.<b>Undo</b></div>
             <div class="dim" id="a-dim"></div>
             <div class="panel" id="a-panel">
@@ -237,9 +252,9 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="chips"><span class="chipx">Movies</span><span class="chipx">Fiction books</span><span class="chipx sel">Flash games</span><span class="chipx">+ New category</span></div>
               <div class="field" id="a-by"></div>
               <div class="field tall" id="a-why"></div>
-              <div class="chips"><span class="chipx w sel">Want to play</span><span class="chipx g">Played</span></div>
+              <div class="chips split"><span class="chipx w sel">Want to play</span><span class="chipx g">Played</span></div>
               <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
-              <div class="chips"><span class="chipx w">☆ Make it a priority</span></div>
+              <div class="chips"><span class="chipx p">! Make it a priority</span></div>
               <div class="btn" id="a-save">Add</div>
             </div>
             <div class="tap" id="a-tap"></div>
@@ -265,11 +280,11 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="irow" data-match="0"><div class="t">Qoosh</div><div class="m">Flash games · Want to play · from my brother</div></div>
               <div class="irow" data-match="1"><div class="t">The Mist</div><div class="m">by Stephen King · Fiction books · Want to read · from Sam</div><div class="n">Short and scary, read it in one sitting</div></div>
               <div class="irow" data-match="0"><div class="t">Titanic</div><div class="m">by James Cameron · Movies · Want to watch · from a stranger on the train</div></div>
-              <div class="irow done" data-match="1"><div class="t">It</div><div class="m">by Stephen King · Fiction books · Read · from my sister</div><span class="r">👍</span></div>
+              <div class="irow done" data-match="1"><div class="t">It</div><div class="m">by Stephen King · Fiction books · Read · from my sister</div><span class="r stars"><b>★★★★</b><em>★</em></span></div>
               <div class="irow" data-match="0"><div class="t">Citizen Kane</div><div class="m">by Orson Welles · Movies · Want to watch</div></div>
-              <div class="irow done" data-match="0"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched</div><span class="r">❤️</span></div>
+              <div class="irow done" data-match="0"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched</div><span class="r stars"><b>★★★★★</b></span></div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>❐</b>Series</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="tap" id="q-tap"></div>
           </div>
         </div>
@@ -278,9 +293,9 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
       <!-- 3. Priority -->
       <section class="scene" id="s-upnext" aria-label="Priority">
         <div class="caption">
-          <div class="eyebrow" style="color: var(--warm)">Priority</div>
+          <div class="eyebrow" style="color: var(--prio)">Priority</div>
           <h2>Pick what's next.</h2>
-          <p>Star what you want to get to soon, and drag it into order.</p>
+          <p>Mark what you want to get to soon, and drag it into order.</p>
           <p><q id="u-quote">Watch Titanic this weekend.</q></p>
         </div>
         <div class="phone" style="left: 760px; top: 40px">
@@ -289,7 +304,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
             <div class="app">
               <div class="apptitle">Recommendations</div>
               <div class="search"><span>⌕</span><span class="ph">Search, or type something new to add…</span></div>
-              <div class="pick"><span>Category</span><b><span style="color: var(--warm)">★</span> Priority</b><span>3</span><span>▾</span></div>
+              <div class="pick"><span>Category</span><b><span style="color: var(--prio); font-weight: 800">!</span> Priority</b><span>3</span><span>▾</span></div>
               <div class="muted">What you want to get to soon. Drag ≡ to change the order; done things leave the list.</div>
               <div class="queue" id="u-queue">
                 <div class="irow" data-key="kane"><div class="t"><i class="rank"></i>Citizen Kane</div><div class="m">by Orson Welles · Movies · from my film teacher</div><span class="grip">≡</span></div>
@@ -297,16 +312,16 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
                 <div class="irow" data-key="pre"><div class="t"><i class="rank"></i>Titanic</div><div class="m">Movies · from a stranger on the train</div><div class="n" id="u-note"></div><span class="grip">≡</span></div>
               </div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>❐</b>Series</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="dim" id="u-dim"></div>
             <div class="panel" id="u-panel">
               <h3>Edit <em><span>×</span></em></h3>
               <div class="field">Titanic</div>
               <div class="field">a stranger on the train</div>
               <div class="field tall" id="u-why"></div>
-              <div class="chips"><span class="chipx w sel">Want to watch</span><span class="chipx g">Watched</span></div>
+              <div class="chips split"><span class="chipx w sel">Want to watch</span><span class="chipx g">Watched</span></div>
               <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
-              <div class="chips"><span class="chipx w sel">★ Priority #1</span></div>
+              <div class="chips"><span class="chipx p sel">! Priority #1</span></div>
               <div class="btn" id="u-save">Save</div>
             </div>
             <div class="tap" id="u-tap"></div>
@@ -319,7 +334,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
         <div class="caption">
           <div class="eyebrow" style="color: var(--green)">Done</div>
           <h2>Watched it? Rate it.</h2>
-          <p>❌ bad, ✅ average, 👍 great, ❤️ exceptional.</p>
+          <p>1 to 5 stars, from Bad 👎 to Amazing 💖.</p>
           <p>It stops being a priority by itself.</p>
         </div>
         <div class="phone" style="left: 760px; top: 40px">
@@ -329,24 +344,23 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="apptitle">Recommendations</div>
               <div class="search"><span>⌕</span><span class="ph">Search, or add a movie…</span></div>
               <div class="pick"><span>Category</span><b>Movies</b><span>3</span><span>▾</span></div>
-              <div class="irow" id="d-row"><div class="t"><i id="d-rank">★ 1 </i>Titanic</div><div class="m" id="d-meta">Movies · Want to watch · from a stranger on the train</div><div class="n">Watch this weekend 🍿</div><span class="r" id="d-heart"></span></div>
-              <div class="irow"><div class="t"><i>★ 2 </i>Citizen Kane</div><div class="m">by Orson Welles · Movies · Want to watch</div></div>
-              <div class="irow done"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched</div><span class="r">❤️</span></div>
+              <div class="irow" id="d-row"><div class="t"><i id="d-rank">! #1 </i>Titanic</div><div class="m" id="d-meta">Movies · Want to watch · from a stranger on the train</div><div class="n">Watch this weekend 🍿</div><span class="r stars" id="d-heart"></span></div>
+              <div class="irow"><div class="t"><i>! #2 </i>Citizen Kane</div><div class="m">by Orson Welles · Movies · Want to watch</div></div>
+              <div class="irow done"><div class="t">The Godfather</div><div class="m">by Francis Ford Coppola · Movies · Watched</div><span class="r stars"><b>★★★★★</b></span></div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>❐</b>Series</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="dim" id="d-dim"></div>
             <div class="panel" id="d-panel">
               <h3>Edit <em><span>×</span></em></h3>
               <div class="field">Titanic</div>
               <div class="field">a stranger on the train</div>
               <div class="field">Watch this weekend 🍿</div>
-              <div class="chips"><span class="chipx w" id="d-want">Want to watch</span><span class="chipx g" id="d-watched">Watched</span></div>
-              <div class="chips">
-                <span class="chipx">❌ Bad</span><span class="chipx">✅ Average</span><span class="chipx">👍 Great</span><span class="chipx sel" id="d-love" style="background: var(--chip); border-color: var(--line); color: var(--text); font-weight: 400">❤️ Exceptional</span>
-              </div>
+              <div class="chips split"><span class="chipx w" id="d-want">Want to watch</span><span class="chipx g" id="d-watched">Watched</span></div>
+              <div class="lbl">Your rating</div>
+              <div class="rate"><i id="d-s1">★</i><i id="d-s2">★</i><i id="d-s3">★</i><i id="d-s4">★</i><i id="d-s5">★</i><span id="d-word"></span></div>
               <div class="prow">Recommended on <b>Oct 22, 2026</b></div>
               <div class="prow" id="d-on" style="visibility: hidden">Watched on <b>Oct 25, 2026</b></div>
-              <div class="chips"><span class="chipx w" id="d-up">★ Priority #1</span></div>
+              <div class="chips"><span class="chipx p" id="d-up">! Priority #1</span></div>
               <div class="btn" id="d-save">Save</div>
             </div>
             <div class="tap" id="d-tap"></div>
@@ -368,10 +382,10 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="chips" style="justify-content: flex-end"><span class="chipx" id="y-sync">⟳ Sync</span></div>
               <div class="irow gone" id="y-ph-new"><div class="t">Bloons Tower Defense</div><div class="m">Flash games · Want to play · from Sam</div></div>
               <div class="irow"><div class="t">Qoosh</div><div class="m">Flash games · Want to play · from my brother</div></div>
-              <div class="irow done"><div class="t">Titanic</div><div class="m">Movies · Watched · from a stranger on the train</div><span class="r">❤️</span></div>
+              <div class="irow done"><div class="t">Titanic</div><div class="m">Movies · Watched · from a stranger on the train</div><span class="r stars"><b>★★★★★</b></span></div>
               <div class="irow"><div class="t">The Mist</div><div class="m">by Stephen King · Fiction books</div></div>
             </div>
-            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
+            <div class="tabs"><div class="cur"><b>★</b>List</div><div><b>❐</b>Series</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="tap" id="y-tap"></div>
           </div>
         </div>
@@ -391,9 +405,9 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
         <div class="browser" style="left: 710px; top: 175px; width: 520px; height: 360px">
           <div class="chrome"><i></i><i></i><i></i><span>recommendation-journal.expo.app</span></div>
           <div class="web">
-            <div class="rail"><div class="cur"><b>★</b>List</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
+            <div class="rail"><div class="cur"><b>★</b>List</div><div><b>❐</b>Series</div><div><b>☰</b>Categories</div><div><b>▦</b>Sheet</div><div><b>⚙</b>Settings</div></div>
             <div class="cats">
-              <div>All <span id="y-all">8</span></div><div><em style="font-style: normal"><span style="color: var(--warm)">★</span> Priority</em> <span>2</span></div><div>Movies <span>3</span></div><div>Fiction books <span>2</span></div><div class="cur">Flash games <span id="y-fg">2</span></div>
+              <div>All <span id="y-all">8</span></div><div><em style="font-style: normal"><span style="color: var(--prio); font-weight: 800">!</span> Priority</em> <span>2</span></div><div>Movies <span>3</span></div><div>Fiction books <span>2</span></div><div class="cur">Flash games <span id="y-fg">2</span></div>
             </div>
             <div class="pane">
               <div class="search" style="height: 32px; font-size: 11.5px; margin-bottom: 6px"><span>⌕</span><span id="y-web-q"></span></div>
@@ -401,7 +415,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
               <div class="irow gone" id="y-web-new2"><div class="t">Bloons Tower Defense</div><div class="m">Want to play · from Sam</div></div>
               <div class="irow gone" id="y-web-new"><div class="t">Qoosh</div><div class="m">Want to play · from my brother</div></div>
               <div class="irow"><div class="t">Fancy Pants</div><div class="m">Want to play · from Sam</div></div>
-              <div class="irow done"><div class="t">Line Rider</div><div class="m">Played · from a forum</div><span class="r">👍</span></div>
+              <div class="irow done"><div class="t">Line Rider</div><div class="m">Played · from a forum</div><span class="r stars"><b>★★★★</b><em>★</em></span></div>
             </div>
           </div>
         </div>
@@ -566,7 +580,7 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
       } else y = order.indexOf(key) * SLOT;
       row.style.top = y + 'px';
       row.classList.toggle('lift', key === 'pre' && u >= dragFrom - 0.2 && u < dragTo + 0.1);
-      row.querySelector('.rank').textContent = `★ ${order.indexOf(key) + 1}  `;
+      row.querySelector('.rank').textContent = `! #${order.indexOf(key) + 1}  `;
     }
     const noting = u >= 4.0 && u < 6.8;
     $('u-panel').classList.toggle('open', noting);
@@ -585,7 +599,8 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
       tapAt(uTap, u, [[3.9, $('u-note').closest('.irow')], [4.5, $('u-why')], [6.6, $('u-save')]]);
     }
 
-    // ---- 4. Done: open it, tap Watched, ❤️, Save. It turns green and stops being a priority.
+    // ---- 4. Done: open it, tap Watched (3 stars to begin with), the fifth star, Save. It turns green
+    // and stops being a priority.
     const d = t - 27;
     const editing = d >= 0.6 && d < 4.4;
     const watched = d >= 1.6, loved = d >= 2.5, saved = d >= 4.4;
@@ -596,13 +611,15 @@ body { font-family: var(--ui); padding-inline: 16px; padding-block: 24px; }
     $('d-up').style.display = watched ? 'none' : '';
     $('d-watched').classList.toggle('sel', watched);
     $('d-on').style.visibility = watched ? 'visible' : 'hidden';
-    const love = $('d-love');
-    love.style.cssText = loved ? 'background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700' : 'background: var(--chip); border-color: var(--line); color: var(--text); font-weight: 400';
+    const rating = loved ? 5 : watched ? 3 : 0; // marking it watched starts it at 3 stars, as the app does
+    for (let i = 1; i <= 5; i++) $('d-s' + i).classList.toggle('lit', i <= rating);
+    $('d-word').textContent = rating === 5 ? 'Amazing 💖' : rating === 3 ? 'Average 🙂' : '';
+    const love = $('d-s5');
     $('d-row').classList.toggle('done', saved);
     $('d-row').classList.toggle('flash', d >= 4.5 && d < 5.6);
-    $('d-rank').textContent = saved ? '' : '★ 1 ';
+    $('d-rank').textContent = saved ? '' : '! #1 ';
     $('d-meta').textContent = saved ? 'Movies · Watched Oct 25, 2026 · from a stranger on the train' : 'Movies · Want to watch · from a stranger on the train';
-    $('d-heart').textContent = saved ? '❤️' : '';
+    $('d-heart').innerHTML = saved ? '<b>★★★★★</b>' : '';
     tapAt($('d-tap'), d, [[0.5, $('d-row')], [1.6, $('d-watched')], [2.5, love], [4.2, $('d-save')]]);
 
     // ---- 5. Sync: from the phone to the sheet's Flash games tab, then to the browser.

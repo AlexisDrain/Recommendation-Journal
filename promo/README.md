@@ -175,6 +175,15 @@ and ffmpeg.
    `sheet`), then `sh encode.sh add` (and so on). `encode.sh` reads the music from
    `promo/trailer/Inspired.mp3`, or from the file named in `MUSIC`. The `rate` take marks Project Hail Mary as read, so import
    `demo.csv` into a fresh profile before taking it again.
+6. Trailer video (`trailer/recommendation-journal-trailer.mp4`, 1920 × 1080, 55 s, with the music):
+   needs only the headless Edge from step 1, not the app. Serve the trailer page
+   (`python -m http.server 8097 --bind 127.0.0.1` in `promo/trailer`), then in `source/` run
+   `node trailer.mjs` (records the page from Restart to the end, about a minute) and
+   `sh trailer.sh` (makes the .mp4 and adds the music, fading in and out). Look at stills before
+   using it, for example `ffmpeg -i ../trailer/recommendation-journal-trailer.mp4 -vf "fps=0.5,scale=480:-1,tile=4x7" -frames:v 1 check.png`:
+   the title card alone at the start, every scene, and the end card held to the last second. If
+   the page's length changes (`SPLASH` + `BODY` in `index.html`), change `LENGTH` in
+   `trailer.mjs` and `length` in `trailer.sh` to match.
 
-The scripts read from and write to `raw/`, `out/` and `frames/` next to themselves: move the
-results into the folders above.
+The scripts read from and write to `raw/`, `out/` and `frames/` next to themselves (git leaves
+those out): move the results into the folders above.
