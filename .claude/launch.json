@@ -22,7 +22,7 @@
         "http.server",
         "8090",
         "--directory",
-        "trailer"
+        "promo/trailer"
       ],
       "port": 8090
     }

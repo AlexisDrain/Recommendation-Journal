@@ -16,7 +16,8 @@ app/
   scripts/        release.js (publish web + phone), make-icons.py (app icons; needs Python + Pillow)
   public/         web icons and manifest
 google-sheets/    the optional Google Sheet sync script and its setup guide
-trailer/          the animated trailer page (open index.html in a browser; ?t=12 opens paused at 12 s)
+promo/            App Store pictures, previews and texts (see promo/README.md)
+  trailer/        the animated trailer page (open index.html in a browser; ?t=12 opens paused at 12 s)
 ```
 
 ## Run it

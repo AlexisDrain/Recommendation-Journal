@@ -122,7 +122,7 @@ No account or sign-in is needed: everything is stored on the device. Syncing wit
 - **Screenshots:** upload them in number order. The first three are the ones most people see in
   search results. Use either the captioned set or the plain one, not a mix.
 - **App previews:** H.264 .mp4 files with music: "Inspired" by Kevin MacLeod, the trailer's
-  track (`trailer/Inspired.mp3`). Its licence (CC BY 4.0) lets anyone use it, ads included, as
+  track (`promo/trailer/Inspired.mp3`). Its licence (CC BY 4.0) lets anyone use it, ads included, as
   long as it's credited, so each preview ends on a 3-second card with the credit, and the
   Description carries it too. Previews start muted on the App Store; people tap for sound.
   After uploading, App Store Connect asks for a poster frame: the moment shown before the video
@@ -173,7 +173,7 @@ and ffmpeg.
 4. Art: serve `source/` (`python -m http.server 8099`), then run `node art.mjs`.
 5. Previews: `python overlay.py` and `python endcard.py`, then `node rec.mjs add` (and `rate`,
    `sheet`), then `sh encode.sh add` (and so on). `encode.sh` reads the music from
-   `trailer/Inspired.mp3`, or from the file named in `MUSIC`. The `rate` take marks Project Hail Mary as read, so import
+   `promo/trailer/Inspired.mp3`, or from the file named in `MUSIC`. The `rate` take marks Project Hail Mary as read, so import
    `demo.csv` into a fresh profile before taking it again.
 
 The scripts read from and write to `raw/`, `out/` and `frames/` next to themselves: move the
