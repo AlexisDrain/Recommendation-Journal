@@ -34,6 +34,12 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Recommendations', tabBarLabel: 'List', tabBarIcon: ({ color }) => <TabIcon glyph="★" color={color} /> }} />
+      {/* Wide screens: a shortcut to the List's Priority, indented under List and a little smaller.
+          Phones: no button (hidden this way, not with href: null, which also makes the page unreachable). */}
+      <Tabs.Screen name="priority" options={{
+        title: 'Recommendations › Priority', tabBarLabel: 'Priority', tabBarIcon: ({ color }) => <TabIcon glyph="!" color={color} />, lazy: true,
+        ...(wide ? { tabBarItemStyle: { marginLeft: 28 }, tabBarLabelStyle: { fontSize: 13 } } : { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const } }),
+      }} />
       <Tabs.Screen name="series" options={{ title: 'Series', tabBarIcon: ({ color }) => <TabIcon glyph="❐" color={color} /> }} />
       <Tabs.Screen name="categories" options={{ title: 'Categories', tabBarIcon: ({ color }) => <TabIcon glyph="☰" color={color} /> }} />
       <Tabs.Screen name="sheet" options={{ title: 'Sheet', tabBarIcon: ({ color }) => <TabIcon glyph="▦" color={color} /> }} />

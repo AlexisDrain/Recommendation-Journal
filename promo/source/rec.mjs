@@ -68,7 +68,7 @@ const scripts = {
     await type('Severance', 120);
     await pause(900);
     await tap('~Add “Severance”', 1300);
-    await tap('Author (or director, artist…), like Stephen King', 400);
+    await tap('Author (optional), or director, artist…', 400);
     await type('Dan Erickson', 70);
     await pause(400);
     await tap('TV shows', 800);
@@ -95,8 +95,8 @@ const scripts = {
     await tap('~Project Hail Mary', 1500);
     await b.ev(`(() => { const s = [...document.querySelectorAll('div')].find((d) => d.innerText?.startsWith('4. ') && d.children.length === 0); s?.scrollIntoView({ behavior: 'smooth', block: 'start' }); })()`);
     await pause(1500);
-    await tap('Read', 1000);
-    await tap('~Exceptional', 1300);
+    await tap('Read', 1000); // done starts at 3 stars…
+    await tap('5 stars, Amazing', 1300); // …and the fifth star makes it Amazing 💖
     await tap('Save', 2000);
     await pause(1200);
     await tap('~Category', 1100);

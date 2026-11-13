@@ -1,6 +1,7 @@
 // The list. One box does both jobs: type to search everything you've saved; if it isn't there,
 // press Enter (or tap "+ Add") to add it, already filled in with what you typed.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Linking, Pressable, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { CategoryPicker, CategoryTabs } from '@/components/CategoryTabs';
@@ -20,6 +21,7 @@ import { confirmAction } from '@/lib/confirm';
 import { withArticle } from '@/lib/categories';
 import { useThemeName } from '@/lib/displayMode';
 import { useDrafts } from '@/lib/drafts';
+import { getListCategory, setListCategory, useListCategory } from '@/lib/listCategory';
 import { hasTitle, search } from '@/lib/search';
 import { colors, radius, space } from '@/lib/theme';
 import type { Item, Status } from '@/lib/types';
@@ -52,13 +54,37 @@ function rememberCategory(uid: string) {
 }
 
 export default function ListScreen() {
+  return <ListView start="all" />;
+}
+
+/**
+ * The list. `start` is 'all' on the List page and 'upnext' on the Priority page (wide screens'
+ * shortcut, see priority.tsx). Both show the same category (listCategory.ts). On wide screens,
+ * Priority belongs to the Priority page and every other category to the List page, so the rail
+ * always marks where you are: picking one moves you to its page.
+ */
+export function ListView({ start }: { start: 'all' | 'upnext' }) {
   useThemeName(); // redraw when the display changes (dark / light)
   const { categories, items, deleted, deletedCategories, loaded, error } = useData();
   const drafts = useDrafts();
   const apkUpdate = useApkUpdate();
   const [query, setQuery] = useState('');
   /** A category's uid, 'all', 'upnext' (Priority) or 'deleted' (Recently deleted). */
-  const [categoryUid, setCategoryUid] = useState<string>('all');
+  const categoryUid = useListCategory();
+  const wide = useWide();
+  const wideNow = useRef(wide); // read when the page is opened, without opening it again on a resize
+  useEffect(() => { wideNow.current = wide; }, [wide]);
+  // Opening the Priority page shows Priority. Opening the List page from the rail while Priority
+  // was showing shows All (on phones, where the List is the only page, Priority just stays).
+  useFocusEffect(useCallback(() => {
+    if (start === 'upnext') setListCategory('upnext');
+    else if (wideNow.current && getListCategory() === 'upnext') setListCategory('all');
+  }, [start]));
+  // The title says when Priority is showing: "Recommendations › Priority".
+  const navigation = useNavigation();
+  useEffect(() => {
+    navigation.setOptions({ title: categoryUid === 'upnext' ? 'Recommendations › Priority' : 'Recommendations' });
+  }, [navigation, categoryUid]);
   const [status, setStatus] = useState<Status | 'all'>('all');
   const [sort, setSortState] = useState<Sort>(lastSort);
   /** "My order" with the ≡ grips showing (iOS-style: a button switches dragging on and off). */
@@ -76,7 +102,6 @@ export default function ListScreen() {
   const [newCategory, setNewCategory] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const input = useRef<TextInputInstance>(null);
-  const wide = useWide();
 
   const visible = useMemo(() => categories.filter((c) => !c.hidden), [categories]);
   const byUid = useMemo(() => new Map(categories.map((c) => [c.uid, c])), [categories]);
@@ -180,8 +205,11 @@ export default function ListScreen() {
   if (error) return <View style={[styles.screen, { padding: space.lg }]}><ErrorBox message={error} onRetry={() => void reload()} /></View>;
 
   const pickCategory = (uid: string) => {
-    setCategoryUid(uid);
+    setListCategory(uid);
     if (byUid.has(uid)) rememberCategory(uid);
+    // Wide screens: Priority has its own page in the rail; every other category is on the List.
+    if (wide && uid === 'upnext' && start !== 'upnext') router.navigate('/priority');
+    if (wide && uid !== 'upnext' && start === 'upnext') router.navigate('/');
   };
   const tabProps = { categories: visible, counts: perCategory, selected: categoryUid, onSelect: pickCategory, onNew: () => setNewCategory(true) };
 

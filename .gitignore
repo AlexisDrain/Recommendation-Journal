@@ -21,3 +21,7 @@ credentials.json
 promo/source/frames/
 promo/source/raw/
 promo/source/out/
+
+# Android APKs downloaded for GitHub Releases (they go on the release, not in the repo)
+releases/
+*.apk

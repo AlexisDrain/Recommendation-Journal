@@ -6,7 +6,8 @@ await b.goto('http://localhost:8081/', 5000);
 for (const t of ['Citizen Kane', 'The Godfather', 'The Count of Monte Cristo']) {
   await b.tap(t, 1200);
   await b.tap('Delete', 1500);
-  console.log('deleted?', t, !(await b.ev(`document.body.innerText.includes(${JSON.stringify(t)})`)));
+  // A list row is a button named after its title (the "Deleted …" message would match the text too).
+  console.log('deleted?', t, !(await b.ev(`[...document.querySelectorAll('[role=button]')].some((e) => (e.getAttribute('aria-label') || '').startsWith(${JSON.stringify(t)}))`)));
 }
 await b.send('Page.setInterceptFileChooserDialog', { enabled: true });
 const chosen = new Promise((r) => b.on((m) => m.method === 'Page.fileChooserOpened' && r(m.params)));

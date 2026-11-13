@@ -83,10 +83,13 @@
   .card:nth-child(3) { transform: rotate(-0.8deg) translateX(-1vh); }
   .card div { flex: 1; min-width: 0; }
   .card b { display: block; font-size: 3vh; line-height: 1.2; font-weight: 600; color: #e8eaf6; white-space: nowrap; }
-  .card b em { font-style: normal; color: #ffc47a; }
+  .card b em { font-style: normal; color: #ffd84d; font-weight: 800; } /* a priority's yellow ! */
   .card small { display: block; font-size: 1.9vh; line-height: 1.25; color: #8a90b2; margin-top: 0.2vh; white-space: nowrap; }
   .card q { display: block; font-size: 2.1vh; line-height: 1.25; color: #e8eaf6; font-style: italic; margin-top: 0.3vh; quotes: none; }
-  .card span.r { font-size: 3.6vh; }
+  /* the rating, as the app shows it: five stars, and what they mean under them */
+  .card span.r { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4vh; }
+  .card span.r .stars { font-size: 2.7vh; letter-spacing: 0.2vh; color: #ffc47a; }
+  .card span.r .word { font-size: 2vh; font-weight: 600; color: #e8eaf6; white-space: nowrap; }
   .cards .title { display: none; text-align: center; margin-bottom: 0.6vh; }
   body.cardart.withname .cards .title { display: block; }
   body.cardart.withname .cards .card:nth-child(4) { display: none; }
@@ -114,8 +117,8 @@
   </div>
   <div class="cards">
     <div class="title"><b>Recommendation <span>Journal</span></b><i>Save recommendations from friends</i></div>
-    <div class="card"><div><b><em>★ 1</em>&nbsp; Severance</b><small>TV shows · Want to watch · from Sam from work</small><q>Watch it before the internet spoils it.</q></div></div>
-    <div class="card done"><div><b>Outer Wilds</b><small>Video games · Played · from my best friend</small><q>Go in knowing nothing.</q></div><span class="r">❤️</span></div>
+    <div class="card"><div><b><em>! #1</em>&nbsp; Severance</b><small>TV shows · Want to watch · from Sam from work</small><q>Watch it before the internet spoils it.</q></div></div>
+    <div class="card done"><div><b>Outer Wilds</b><small>Video games · Played · from my best friend</small><q>Go in knowing nothing.</q></div><span class="r"><span class="stars">★★★★★</span><span class="word">Amazing 💖</span></span></div>
   </div>
   <div class="hero"><img src="out/icon.png"><b>Recommendation <span>Journal</span></b><i>Recommendations from friends</i></div>
   <div class="named"><div><b>Recommendation <span>Journal</span></b><i>Recommendations from friends</i></div></div>
