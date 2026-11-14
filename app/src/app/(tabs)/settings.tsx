@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, ScrollView, Switch, Text, View } from 'react-native';
+import { Linking, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { GoogleSheetCard } from '@/components/GoogleSheetCard';
 import { Button, Card, Chip, ErrorBox, Muted, Row, styles } from '@/components/ui';
 import { exportCsv, exportXlsx, pickAndImport } from '@/db/exchange';
@@ -13,6 +13,10 @@ import { NARROW_PAGE, page } from '@/lib/useLayout';
 import { setWelcomeSeen } from '@/lib/welcome';
 
 const DISPLAY_MODES: [DisplayMode, string][] = [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Light by day, dark at night']];
+/** What to do with a Google Sheet on a phone: it can't be picked for Import as it is (from Sleep Journal). */
+const GOOGLE_SHEET_TIP = Platform.OS === 'ios'
+  ? 'A Google Sheet can’t be imported straight from Google Drive. Connect it above instead, or in the Google Sheets app tap ⋯ → Share & export → Send a copy → Excel, save it to Files, and import that.'
+  : 'A Google Sheet shows greyed out in Drive: it can’t be imported as it is. Connect it above instead, or in the Drive app tap ⋮ → Download (it saves an .xlsx), then import that from Downloads.';
 const SUPPORT_MAIL = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Recommendation Journal feedback (build ${buildInfo.build})`)}`;
 const hour = (h: number) => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
 
@@ -87,6 +91,9 @@ export default function SettingsScreen() {
           your list, it only fills in what’s empty (like a series) and never changes what you’ve filled in.
         </Muted>
         <Button title="Import .xlsx or .csv" onPress={importFile} busy={busy === 'import'} small color={colors.chip} textColor={colors.text} />
+        {/* Phones can't pick a Google Sheet itself (Android greys it out; Drive only offers apps a PDF of
+            it): say what works instead, before someone tries. */}
+        {Platform.OS !== 'web' && <Muted>{GOOGLE_SHEET_TIP}</Muted>}
         {importMsg && <Text style={{ color: colors.success }}>{importMsg}</Text>}
       </Card>
 

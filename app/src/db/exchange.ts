@@ -7,6 +7,7 @@
 // category) adds nothing new: it only fills in what that entry leaves empty (a series, the author,
 // a rating…). What you've filled in yourself is never overwritten.
 import * as DocumentPicker from 'expo-document-picker';
+import { Platform } from 'react-native';
 import { categoryKey, normalize, suggestWords } from '@/lib/categories';
 import { stamp, today } from '@/lib/dates';
 import type { Category, Item } from '@/lib/types';
@@ -189,17 +190,43 @@ export async function importTables(tables: { name: string; rows: string[][] }[],
   return result;
 }
 
+const SAVE_AS_EXCEL = Platform.OS === 'ios'
+  ? 'save a copy as an Excel file (in the Google Sheets app: ⋯ → Share & export → Send a copy → Excel, then Save to Files)'
+  : 'download it as an Excel file (in the Drive app: ⋮ → Download, which saves an .xlsx)';
+
+export const GOOGLE_FILE_MESSAGE =
+  "That's a Google Sheet, which isn't a file the app can open. Two ways to bring it in: connect it in " +
+  `Settings → Google Sheet (all its recommendations come in, and stay in sync), or ${SAVE_AS_EXCEL} and import that file.`;
+
+/**
+ * Google's own documents (Sheets, Docs…): by their type (Android), or by the shortcut file Google Drive
+ * gives elsewhere, which only links to the document online (My recommendations.gsheet).
+ */
+export const isGoogleFile = (mimeType?: string | null, name?: string | null) =>
+  (!!mimeType && mimeType.startsWith('application/vnd.google-apps')) || /\.g(sheet|doc|slides|form|draw|site)$/i.test(name ?? '');
+
+/**
+ * The file to import, or null if cancelled. Any file can be picked (as in Sleep Journal), so that a
+ * Google Sheet's .gsheet shortcut (iPhone, the web) reaches the check above and gets its message,
+ * instead of just being greyed out. A Google Sheet itself can't be picked as a file on a phone: Drive
+ * offers apps only a PDF of it.
+ */
+async function pickFile(): Promise<DocumentPicker.DocumentPickerAsset | null> {
+  let picked: DocumentPicker.DocumentPickerResult;
+  try {
+    picked = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+  } catch (e) {
+    // Android can't copy a Google document (it has no file to copy): the picker fails here.
+    throw new Error(`${(e as Error).message}\n\nIf you picked a Google Sheet: ${GOOGLE_FILE_MESSAGE}`);
+  }
+  return picked.canceled || !picked.assets?.[0] ? null : picked.assets[0];
+}
+
 /** Asks for a .csv or .xlsx file and imports it. Null if nothing was picked. */
 export async function pickAndImport(): Promise<ImportResult | null> {
-  const picked = await DocumentPicker.getDocumentAsync({
-    type: [
-      'text/csv', 'text/comma-separated-values', 'text/plain', 'application/csv',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel',
-    ],
-    copyToCacheDirectory: true,
-  });
-  if (picked.canceled || !picked.assets?.[0]) return null;
-  const asset = picked.assets[0];
+  const asset = await pickFile();
+  if (!asset) return null;
+  if (isGoogleFile(asset.mimeType, asset.name)) throw new Error(GOOGLE_FILE_MESSAGE);
   const baseName = (asset.name ?? '').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
   const fallback = !baseName || /^recommendations( \d{4}.*)?$/i.test(baseName) ? 'Imported' : baseName;
   if (/\.xlsx$/i.test(asset.name ?? '') || asset.mimeType?.includes('spreadsheetml')) {
