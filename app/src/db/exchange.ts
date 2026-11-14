@@ -102,8 +102,22 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-/** `updated`: already on your list, and the file filled in some of its empty fields. */
-export interface ImportResult { added: number; updated: number; skipped: number; categoriesAdded: string[] }
+/**
+ * `updated`: already on your list, and the file filled in some of its empty fields. `skipped`: already
+ * on your list, nothing to fill in. `blank`: rows without a title (empty rows, notes under a table).
+ */
+export interface ImportResult { added: number; updated: number; skipped: number; blank: number; categoriesAdded: string[] }
+
+/**
+ * How an import is going: `done` of `total` rows saved. (0, 0) means the file is still being read,
+ * before anything is saved: on a phone, opening a big .xlsx can take most of the time.
+ */
+export type ImportProgress = (done: number, total: number) => void;
+
+/** Rows saved per transaction: small enough that the screen keeps drawing between them. */
+export const IMPORT_BATCH = 25;
+/** Lets the screen draw (and other tabs reach the database) before going on. */
+const breathe = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
 /** The fields an import may fill in on an entry you already have, when that entry leaves them empty. */
 const FILLABLE = ['author', 'series', 'recommendedBy', 'note', 'rating', 'recommendedOn', 'doneOn'] as const;
@@ -125,67 +139,91 @@ const BOOKKEEPING_TABS = new Set(['categories', 'deleted']);
 /**
  * Adds the tables' rows to the list. `fallback` names the category for a table that has neither a
  * Category column nor a meaningful tab name.
+ *
+ * In two steps (from Sleep Journal): first every row is read and checked, and nothing is written, so
+ * a file that isn't a list changes nothing. Then the rows are saved IMPORT_BATCH at a time, each batch
+ * in its own transaction, with a pause between them so the screen keeps drawing (and shows the
+ * progress) and other tabs aren't locked out. Something already on your list is kept as it is (only
+ * its empty fields are filled in), so an import that's cut off can simply be run again: it carries on
+ * where it stopped, without doubling anything.
  */
-export async function importTables(tables: { name: string; rows: string[][] }[], fallback = 'Imported'): Promise<ImportResult> {
+export async function importTables(
+  tables: { name: string; rows: string[][] }[], fallback = 'Imported', onProgress?: ImportProgress,
+): Promise<ImportResult> {
   const categories = (await allCategories()).filter((c) => !c.deleted);
   const existing = (await allItems()).filter((i) => !i.deleted);
   const uids = new Set((await allItems()).map((i) => i.uid));
   const byUid = new Map(existing.map((i) => [i.uid, i]));
   const byKey = new Map(existing.map((i) => [`${i.categoryUid}\n${normalize(i.title)}`, i]));
   const seen = new Set(byKey.keys());
-  const filled = new Set<string>(); // entries this import already filled in (a file may list one twice)
-  const result: ImportResult = { added: 0, updated: 0, skipped: 0, categoriesAdded: [] };
+  const filled = new Set<string>(); // entries this import already fills in (a file may list one twice)
+  const result: ImportResult = { added: 0, updated: 0, skipped: 0, blank: 0, categoriesAdded: [] };
   const now = stamp();
   let order = categories.reduce((m, c) => Math.max(m, c.sortOrder), 0);
 
-  const db = await getDb();
-  await transaction(db, async (tx) => {
-    const categoryFor = async (name: string): Promise<Category> => {
-      const found = categories.find((c) => categoryKey(c.name) === categoryKey(name));
-      if (found) return found;
-      const c: Category = { id: 0, uid: newUid(), name, ...suggestWords(name), sortOrder: ++order, hidden: false, deleted: false, updatedAt: now };
-      await writeCategory(tx, c);
-      categories.push(c);
-      result.categoriesAdded.push(name);
-      return c;
-    };
-
-    for (const table of tables) {
-      if (BOOKKEEPING_TABS.has(table.name.trim().toLowerCase())) continue;
-      // The header is the first row with a Title-like column (lists often start with a heading line).
-      const start = table.rows.findIndex((r) => mapHeader(r).col.Title !== undefined);
-      if (start < 0) continue;
-      const map = mapHeader(table.rows[start]);
-      const idCol = table.rows[start].findIndex((h) => normalize(h) === 'id');
-      const tabCategory = GENERIC_TAB.test(table.name.trim()) || !table.name.trim() ? fallback : table.name.trim();
-      for (const row of table.rows.slice(start + 1)) {
-        const category = await categoryFor(rowCategory(map, row) || tabCategory);
-        const fields = rowFields(map, row, category);
-        if (!fields) continue;
-        const key = `${category.uid}\n${normalize(fields.title)}`;
-        const id = idCol >= 0 ? String(row[idCol] ?? '').trim() : '';
-        if (seen.has(key) || (id && uids.has(id))) {
-          // Already on your list: fill in only what it leaves empty.
-          const mine = (id && byUid.get(id)) || byKey.get(key);
-          const fill = mine && !filled.has(mine.uid) ? emptyFieldsFilled(mine, fields) : {};
-          if (mine && Object.keys(fill).length) {
-            await writeItem(tx, { ...mine, ...fill, updatedAt: now });
-            filled.add(mine.uid);
-            result.updated++;
-          } else {
-            result.skipped++;
-          }
-          continue;
+  // 1. Read and check every row. Nothing is written yet: what to write is collected here.
+  const newCategories: Category[] = [];
+  const writes: Parameters<typeof writeItem>[1][] = [];
+  const categoryFor = (name: string): Category => {
+    const found = categories.find((c) => categoryKey(c.name) === categoryKey(name));
+    if (found) return found;
+    const c: Category = { id: 0, uid: newUid(), name, ...suggestWords(name), sortOrder: ++order, hidden: false, deleted: false, updatedAt: now };
+    categories.push(c);
+    newCategories.push(c);
+    result.categoriesAdded.push(name);
+    return c;
+  };
+  for (const table of tables) {
+    if (BOOKKEEPING_TABS.has(table.name.trim().toLowerCase())) continue;
+    // The header is the first row with a Title-like column (lists often start with a heading line).
+    const start = table.rows.findIndex((r) => mapHeader(r).col.Title !== undefined);
+    if (start < 0) continue;
+    const map = mapHeader(table.rows[start]);
+    const idCol = table.rows[start].findIndex((h) => normalize(h) === 'id');
+    const tabCategory = GENERIC_TAB.test(table.name.trim()) || !table.name.trim() ? fallback : table.name.trim();
+    for (const row of table.rows.slice(start + 1)) {
+      if (!row.some((cell) => String(cell ?? '').trim())) { result.blank++; continue; }
+      // Its category's own words ("Read", "Watched") tell whether it's done: a new one gets them guessed.
+      const category = categoryFor(rowCategory(map, row) || tabCategory);
+      const fields = rowFields(map, row, category);
+      if (!fields) { result.blank++; continue; } // no title: nothing to add
+      const key = `${category.uid}\n${normalize(fields.title)}`;
+      const id = idCol >= 0 ? String(row[idCol] ?? '').trim() : '';
+      if (seen.has(key) || (id && uids.has(id))) {
+        // Already on your list: fill in only what it leaves empty.
+        const mine = (id && byUid.get(id)) || byKey.get(key);
+        const fill = mine && !filled.has(mine.uid) ? emptyFieldsFilled(mine, fields) : {};
+        if (mine && Object.keys(fill).length) {
+          writes.push({ ...mine, ...fill, updatedAt: now });
+          filled.add(mine.uid);
+          result.updated++;
+        } else {
+          result.skipped++;
         }
-        seen.add(key);
-        // A backup's own ids are kept, so restoring it doesn't duplicate rows in the Google Sheet.
-        const uid = /^[\w-]{6,64}$/.test(id) ? id : newUid();
-        uids.add(uid);
-        await writeItem(tx, { uid, categoryUid: category.uid, deleted: false, updatedAt: now, ...fields, author: fields.author ?? '', series: fields.series ?? '', queuePos: fields.queuePos ?? null });
-        result.added++;
+        continue;
       }
+      seen.add(key);
+      // A backup's own ids are kept, so restoring it doesn't duplicate rows in the Google Sheet.
+      const uid = /^[\w-]{6,64}$/.test(id) ? id : newUid();
+      uids.add(uid);
+      writes.push({ uid, categoryUid: category.uid, deleted: false, updatedAt: now, ...fields, author: fields.author ?? '', series: fields.series ?? '', queuePos: fields.queuePos ?? null });
+      result.added++;
     }
-  });
+  }
+
+  // 2. Save: the new categories first, then the rows a batch at a time.
+  const total = writes.length;
+  onProgress?.(0, total);
+  const db = await getDb();
+  if (newCategories.length) {
+    await transaction(db, async (tx) => { for (const c of newCategories) await writeCategory(tx, c); });
+  }
+  for (let i = 0; i < total; i += IMPORT_BATCH) {
+    const batch = writes.slice(i, i + IMPORT_BATCH);
+    await transaction(db, async (tx) => { for (const it of batch) await writeItem(tx, it); });
+    onProgress?.(Math.min(i + IMPORT_BATCH, total), total);
+    await breathe();
+  }
   await reload();
   return result;
 }
@@ -223,18 +261,21 @@ async function pickFile(): Promise<DocumentPicker.DocumentPickerAsset | null> {
 }
 
 /** Asks for a .csv or .xlsx file and imports it. Null if nothing was picked. */
-export async function pickAndImport(): Promise<ImportResult | null> {
+export async function pickAndImport(onProgress?: ImportProgress): Promise<ImportResult | null> {
   const asset = await pickFile();
   if (!asset) return null;
   if (isGoogleFile(asset.mimeType, asset.name)) throw new Error(GOOGLE_FILE_MESSAGE);
+  // "Reading the file…" on screen before the slow part (opening a big .xlsx) begins.
+  onProgress?.(0, 0);
+  await breathe(50);
   const baseName = (asset.name ?? '').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
   const fallback = !baseName || /^recommendations( \d{4}.*)?$/i.test(baseName) ? 'Imported' : baseName;
   if (/\.xlsx$/i.test(asset.name ?? '') || asset.mimeType?.includes('spreadsheetml')) {
-    return importTables(readXlsx(await readPickedBytes(asset)), fallback);
+    return importTables(readXlsx(await readPickedBytes(asset)), fallback, onProgress);
   }
   if (/\.xls$/i.test(asset.name ?? '')) {
     throw new Error('Old .xls files can’t be read. Open it in Excel or Google Sheets and save it as .xlsx or .csv.');
   }
   const text = (await readPickedText(asset)).replace(/^﻿/, '');
-  return importTables([{ name: fallback, rows: parseCsv(text) }], fallback);
+  return importTables([{ name: fallback, rows: parseCsv(text) }], fallback, onProgress);
 }

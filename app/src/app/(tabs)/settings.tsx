@@ -8,7 +8,7 @@ import { installedCode, loadApkChecksOff, saveApkChecksOff } from '@/lib/apkUpda
 import buildInfo from '@/lib/buildInfo.json';
 import { DAY_ENDS, DAY_STARTS, setDisplayMode, useDisplayMode, useThemeName, type DisplayMode } from '@/lib/displayMode';
 import { REPO_URL, SUPPORT_EMAIL } from '@/lib/links';
-import { colors } from '@/lib/theme';
+import { colors, space } from '@/lib/theme';
 import { NARROW_PAGE, page } from '@/lib/useLayout';
 import { setWelcomeSeen } from '@/lib/welcome';
 
@@ -25,6 +25,8 @@ export default function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<'xlsx' | 'csv' | 'import' | null>(null);
+  /** An import under way: rows saved of all to save (total 0: still reading the file). */
+  const [importing, setImporting] = useState<{ done: number; total: number } | null>(null);
   const display = useDisplayMode();
   const [apkChecks, setApkChecks] = useState(true);
   useEffect(() => { loadApkChecksOff().then((off) => setApkChecks(!off), () => {}); }, []);
@@ -43,16 +45,21 @@ export default function SettingsScreen() {
 
   const importFile = () => run('import', async () => {
     setImportMsg(null);
-    const r = await pickAndImport();
-    if (!r) return;
-    requestSync();
-    setImportMsg(
-      `Added ${r.added} recommendation${r.added === 1 ? '' : 's'}` +
-      (r.updated ? ` · filled in empty fields on ${r.updated} already on your list` : '') +
-      (r.skipped ? ` · ${r.skipped} already on your list (kept as is)` : '') +
-      (r.categoriesAdded.length ? ` · new categories: ${r.categoriesAdded.join(', ')}` : '') +
-      (r.added + r.updated + r.skipped === 0 ? '. No rows with a Title (or Name) column were found.' : '.'),
-    );
+    try {
+      const r = await pickAndImport((done, total) => setImporting({ done, total }));
+      if (!r) return;
+      requestSync();
+      setImportMsg(
+        `Imported ${r.added}` +
+        (r.updated ? ` · filled in empty fields on ${r.updated} already on your list` : '') +
+        (r.skipped ? ` · ${r.skipped} already on your list (kept as is)` : '') +
+        (r.blank ? ` · ${r.blank} blank row${r.blank === 1 ? '' : 's'} skipped` : '') +
+        (r.categoriesAdded.length ? ` · new categories: ${r.categoriesAdded.join(', ')}` : '') +
+        (r.added + r.updated + r.skipped === 0 ? '. No rows with a Title (or Name) column were found.' : '.'),
+      );
+    } finally {
+      setImporting(null);
+    }
   });
 
   return (
@@ -90,7 +97,18 @@ export default function SettingsScreen() {
           Name, Status, Rating, Recommended by, Why or Notes…) and each tab becomes a category. For things already on
           your list, it only fills in what’s empty (like a series) and never changes what you’ve filled in.
         </Muted>
-        <Button title="Import .xlsx or .csv" onPress={importFile} busy={busy === 'import'} small color={colors.chip} textColor={colors.text} />
+        <Button title="Import .xlsx or .csv" onPress={importFile} busy={busy === 'import' || !!importing} small color={colors.chip} textColor={colors.text} />
+        {importing && (
+          // How far the import is: a thin bar, and in words. Reading a big file comes first (total 0).
+          <View style={{ gap: space.xs }}>
+            <View accessibilityRole="progressbar" accessibilityLabel="Import progress"
+              accessibilityValue={{ min: 0, max: importing.total || 1, now: importing.done }}
+              style={{ height: 6, borderRadius: 3, backgroundColor: colors.chip, overflow: 'hidden' }}>
+              <View style={{ height: '100%', backgroundColor: colors.accent, width: `${importing.total ? (importing.done / importing.total) * 100 : 0}%` }} />
+            </View>
+            <Muted>{importing.total ? `Importing… ${importing.done} of ${importing.total} items` : 'Reading the file…'}</Muted>
+          </View>
+        )}
         {/* Phones can't pick a Google Sheet itself (Android greys it out; Drive only offers apps a PDF of
             it): say what works instead, before someone tries. */}
         {Platform.OS !== 'web' && <Muted>{GOOGLE_SHEET_TIP}</Muted>}
