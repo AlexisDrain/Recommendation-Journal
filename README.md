@@ -1,6 +1,6 @@
 # Recommendation Journal
 
-Remember what people recommend to you, who told you, and why: movies, video games, albums, and more. Mark them done and rate them when you've tried them.
+Save and remember what people recommend to you, who told you, and why: movies, video games, albums, and more. Mark them done and rate them when you've tried them.
 
 Type in one box: it searches your list and allows you to add what's not there yet.
 
