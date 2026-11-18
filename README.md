@@ -12,9 +12,9 @@ You can sync your data between devices using your own Google Sheet, or import/ex
 
 ## Get the app
 
-- **Any computer browser:** https://sleep-journal.expo.app
+- **Any computer browser:** https://recommendation-journal.expo.app/
 - **iPhone App Store:** https://apps.apple.com/us/app/recommendation-journal/id6827766426
-- **Android:** download the `.apk` from the [Releases](https://github.com/AlexisDrain/SleepJournal/releases) page.
+- **Android:** download the `.apk` from the [Releases](https://github.com/AlexisDrain/Recommendation-Journal/releases) page.
 
 ## Trailer & Guide
 https://github.com/user-attachments/assets/c766dac4-a9f0-4bc6-ab28-0ebb2e29d13b
