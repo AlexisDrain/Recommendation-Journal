@@ -120,6 +120,54 @@ Apple adds the © itself.
 ## Reviewer Notes
 No account or sign-in is needed: everything is stored on the device. Syncing with a Google Sheet (Settings → Google Sheet) is optional and needs the user’s own Google Sheet; the rest of the app works fully without it.
 
+### Reviewer Notes for the resubmission (after the Guideline 2.1 "Information Needed" reply)
+
+Apple asked for a screen recording plus five answers in the Notes field. Paste this, and attach the
+recording (see "Review recording" below):
+
+```
+1. SCREEN RECORDING
+Attached: recorded on an iPhone running the latest iOS, starting from launching the app. There is no account, sign-in, user-generated content shared with others, or paid content in this app.
+
+2. PURPOSE AND AUDIENCE
+Recommendation Journal is a free, open-source list of things people recommend to you (movies, books, shows, games, albums and more), for anyone who forgets the recommendations they get from friends and family. For each one it keeps who recommended it and why; you can mark it done, rate it from 1 to 5 stars, and rank what to get to next.
+
+3. HOW TO USE IT
+No login, demo account or sample files are needed: everything works offline on the device.
+- On first launch, a short welcome, then "Start my list" opens the List with three example entries.
+- List: type a title in the top box and tap "+ Add" to add it (category, who, why); the same box searches. Tap an entry to mark it done, rate it with stars, or make it a priority.
+- Series, Categories and Sheet: the list grouped by series, the categories to edit, and the whole list as a table.
+- Settings: display, export/import as .xlsx or .csv, and optional sync with the user's own Google Sheet.
+Google Sheet sync is optional and needs the user's own Google account: the user makes a copy of a template sheet, deploys the script inside it as their own Apps Script web app, and pastes its web address and a secret key into Settings → Google Sheet. The app then sends the list straight from the device to that sheet. It is not needed to review any other feature.
+
+4. EXTERNAL SERVICES
+- Expo (EAS Update): delivers app updates. No user data is sent.
+- Google Apps Script / Google Sheets: only if the user connects their own sheet (above). The developer has no server and never receives any data.
+No analytics, ads, AI, authentication or payment services. Setup guide is here: https://github.com/AlexisDrain/Recommendation-Journal/tree/main/google-sheets
+
+5. REGIONS
+The app works the same in every region. It is in English.
+
+6. REGULATED INDUSTRY / THIRD-PARTY MATERIAL
+Not applicable. The app shows no posters, covers or other third-party media: entries are plain text the user types. The app previews use the music "Inspired" by Kevin MacLeod (incompetech.com) under Creative Commons Attribution 4.0, credited in the previews and the description.
+```
+
+### Review recording (for Apple, not the store)
+
+On the iPhone: Control Center → Screen Recording. About 1–2 minutes. Delete the app and install it
+again from TestFlight first, so the recording starts at the welcome screens.
+
+1. Start on the Home Screen and tap the app's icon.
+2. The welcome: "Get started", then "Start my list".
+3. List: add *Severance* (TV shows, who and why), then search "god".
+4. Open *The Count of Monte Cristo*: tap "Read", tap the fifth star, Save. Make *Severance* a
+   priority, then show Category → Priority.
+5. Series, Categories and Sheet: a few seconds each.
+6. Settings: switch Light and Dark, tap Export, and show the Google Sheet card (no need to connect).
+
+Don't show a real sheet's web address or secret key. Attach the file in App Store Connect → App
+Review Information → Attachment, or to the reply in App Review.
+
 ## Pictures and videos
 
 | Field in App Store Connect | File | Size |
