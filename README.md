@@ -17,7 +17,8 @@ You can sync your data between devices using your own Google Sheet, or import/ex
   page.
 - **iPhone App Store:** not yet. Use the web version for now.
 
-![Promo header](promo/wide-header/github-social-1280x640.png)
+## Trailer & Guide
+https://github.com/user-attachments/assets/c766dac4-a9f0-4bc6-ab28-0ebb2e29d13b
 
 ## Forking
 
