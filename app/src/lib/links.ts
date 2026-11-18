@@ -17,4 +17,8 @@ export const SHEET_GUIDE_URL: string = `${REPO_URL}/blob/main/google-sheets/READ
  * Where people write about problems and ideas, and send a spreadsheet (Settings → Help).
  * It ships in the open-source app, so it's public.
  */
+/** The app on the App Store, and the Android APK on GitHub (the website's "Get Mobile App" tab). */
+export const APP_STORE_URL: string = 'https://apps.apple.com/us/app/recommendation-journal/id6827766426';
+export const APK_URL: string = `${REPO_URL}/releases/latest`;
+
 export const SUPPORT_EMAIL: string = 'alexisdrain97@gmail.com';

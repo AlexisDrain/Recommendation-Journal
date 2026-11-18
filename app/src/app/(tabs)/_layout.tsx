@@ -44,6 +44,10 @@ export default function TabsLayout() {
       <Tabs.Screen name="categories" options={{ title: 'Categories', tabBarIcon: ({ color }) => <TabIcon glyph="☰" color={color} /> }} />
       <Tabs.Screen name="sheet" options={{ title: 'Sheet', tabBarIcon: ({ color }) => <TabIcon glyph="▦" color={color} /> }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color }) => <TabIcon glyph="⚙" color={color} /> }} />
+      {/* Website only: where to get the phone apps. On a narrow screen the bottom bar has room for a short label. */}
+      <Tabs.Screen name="get-app" options={Platform.OS === 'web'
+        ? { title: 'Get Mobile App ↗︎', tabBarLabel: wide ? 'Get Mobile App ↗︎' : 'Get app ↗︎', tabBarIcon: ({ color }) => <TabIcon glyph="▯" color={color} /> }
+        : { tabBarButton: () => null, tabBarItemStyle: { display: 'none' }, lazy: true }} />
     </Tabs>
   );
 }
